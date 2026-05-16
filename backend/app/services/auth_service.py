@@ -74,12 +74,14 @@ class AuthenticationService:
         return {"user": user, "access_token": access_token, "refresh_token": refresh_token}
 
     def logout_user(self, refresh_token: str) -> bool:
-        for user in list(self.user_repository._users_by_id.values()):
-            for session in user.sessions:
-                if session.refresh_token == refresh_token:
-                    session.is_active = False
-                    self.user_repository.update(user)
-                    return True
+        user = self.user_repository.find_by_refresh_token(refresh_token)
+        if not user:
+            return False
+        for session in user.sessions:
+            if session.refresh_token == refresh_token:
+                session.is_active = False
+                self.user_repository.update(user)
+                return True
         return False
 
     def forgot_password(self, email: str) -> str:

@@ -36,4 +36,4 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 ## Notes
 
-This version uses an in-memory repository so it runs immediately. Replace `InMemoryUserRepository` with a database-backed implementation when you are ready for persistence.
+This version uses a MongoDB-backed repository for persistence. Set `MONGO_URI` and `MONGO_DB_NAME` in the environment to configure the MongoDB connection.

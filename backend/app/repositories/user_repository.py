@@ -54,3 +54,10 @@ class InMemoryUserRepository(UserRepository):
 
     def exists_by_email(self, email: str) -> bool:
         return email.lower() in self._email_index
+
+    def find_by_refresh_token(self, refresh_token: str) -> Optional[User]:
+        for user in self._users_by_id.values():
+            for session in user.sessions:
+                if session.refresh_token == refresh_token:
+                    return user
+        return None

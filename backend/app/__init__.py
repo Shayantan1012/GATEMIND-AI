@@ -1,9 +1,10 @@
 from flask import Flask, jsonify
+from pymongo import MongoClient
 
 from app.config import Config
 from app.controllers.auth_controller import auth_bp
 from app.controllers.user_controller import user_bp
-from app.repositories.user_repository import InMemoryUserRepository
+from app.repositories.mongo_user_repository import MongoUserRepository
 from app.services.auth_service import AuthenticationService
 from app.services.email_notification_service import EmailNotificationService
 from app.services.email_verification_service import EmailVerificationService
@@ -16,7 +17,9 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    user_repository = InMemoryUserRepository()
+    mongo_client = MongoClient(app.config["MONGO_URI"])
+    db = mongo_client[app.config["MONGO_DB_NAME"]]
+    user_repository = MongoUserRepository(db)
     password_service = PasswordService()
     jwt_service = JWTService(app.config["SECRET_KEY"])
     email_notification_service = EmailNotificationService()
