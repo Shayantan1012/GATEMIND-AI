@@ -25,6 +25,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `POST /api/auth/forgot-password`
+- `POST /api/auth/reset-password`
 - `POST /api/auth/verify-otp`
 - `POST /api/auth/verify-email`
 - `POST /api/auth/refresh-token`
@@ -37,3 +38,13 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ## Notes
 
 This version uses a MongoDB-backed repository for persistence. Set `MONGO_URI` and `MONGO_DB_NAME` in the environment to configure the MongoDB connection.
+
+Email delivery is supported via environment variables:
+
+- `EMAIL_SMTP_HOST`
+- `EMAIL_SMTP_PORT`
+- `EMAIL_SMTP_USERNAME`
+- `EMAIL_SMTP_PASSWORD`
+- `EMAIL_FROM_ADDRESS`
+
+If SMTP variables are not set, email output will be printed to the console for development and testing.

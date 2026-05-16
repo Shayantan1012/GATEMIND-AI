@@ -50,6 +50,7 @@ class AuthenticationService:
         )
         self.user_repository.save(user)
         self.verification_service.send_otp(user)
+        self.verification_service.send_verification(user)
         return user
 
     def authenticate_user(self, email: str, password: str) -> dict:
@@ -90,8 +91,32 @@ class AuthenticationService:
             return ""
         return self.verification_service.send_otp(user)
 
+    def reset_password(self, otp: str, new_password: str) -> bool:
+        user_id = self.verification_service.verify_otp(otp)
+        if not user_id:
+            raise ValueError("Invalid or expired OTP")
+
+        if not self.password_service.validate_password_strength(new_password):
+            raise ValueError("Password must be at least 8 characters and include letters and numbers")
+
+        user = self.user_repository.find_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        user.password_hash = self.password_service.hash_password(new_password)
+        self.user_repository.update(user)
+        return True
+
     def verify_email(self, token: str) -> bool:
-        return self.verification_service.verify_email_token(token)
+        user_id = self.verification_service.verify_email_token(token)
+        if not user_id:
+            return False
+        user = self.user_repository.find_by_id(user_id)
+        if not user:
+            return False
+        user.activate()
+        self.user_repository.update(user)
+        return True
 
     def verify_otp(self, otp: str) -> User:
         user_id = self.verification_service.verify_otp(otp)

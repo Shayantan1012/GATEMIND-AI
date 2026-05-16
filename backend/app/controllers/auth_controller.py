@@ -80,3 +80,13 @@ def refresh_token():
         return success_response({"access_token": access_token}, "Access token refreshed")
     except (ValueError, jwt.InvalidTokenError) as error:
         return error_response(str(error), 401)
+
+
+@auth_bp.post("/reset-password")
+def reset_password():
+    payload = request.get_json(silent=True) or {}
+    try:
+        get_auth_service().reset_password(payload.get("otp", ""), payload.get("new_password", ""))
+        return success_response(message="Password reset successful")
+    except ValueError as error:
+        return error_response(str(error), 400)

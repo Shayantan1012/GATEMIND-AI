@@ -18,11 +18,12 @@ class EmailVerificationService(VerificationStrategy):
 
     def send_verification(self, user) -> str:
         token = self.generate_email_token(user)
-        self.email_notification_service.send_verification_email(user.email, token)
+        verification_link = f"https://your-app.example.com/verify-email?token={token}"
+        self.email_notification_service.send_verification_email(user.email, verification_link)
         return token
 
     def verify(self, token: str) -> bool:
-        return self.verify_email_token(token)
+        return self.verify_email_token(token) is not None
 
     def generate_email_token(self, user) -> str:
         token = secrets.token_urlsafe(32)
@@ -32,15 +33,15 @@ class EmailVerificationService(VerificationStrategy):
         }
         return token
 
-    def verify_email_token(self, token: str) -> bool:
+    def verify_email_token(self, token: str) -> str | None:
         token_data = self._tokens.get(token)
         if not token_data:
-            return False
+            return None
         if token_data["expires_at"] < datetime.now(timezone.utc):
             self._tokens.pop(token, None)
-            return False
+            return None
         self._tokens.pop(token, None)
-        return True
+        return token_data["user_id"]
 
     def send_otp(self, user) -> str:
         otp = f"{secrets.randbelow(1000000):06d}"
