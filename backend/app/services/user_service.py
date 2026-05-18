@@ -31,7 +31,7 @@ class UserService:
         user.password_hash = self.password_service.hash_password(new_password)
         self.user_repository.update(user)
         return True
-
+# /////////////////////////////////////////////////////////////////////////////////////////////////
     def get_preparation_progress(self, user_id: str) -> dict:
         profile = self.get_user_profile(user_id)
         return {

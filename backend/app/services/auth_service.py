@@ -14,6 +14,7 @@ class AuthenticationService:
         self.password_service = password_service
         self.jwt_service = jwt_service
         self.verification_service = verification_service
+        self.pending_users = {}
 
     def register_user(self, data: dict) -> User:
         required_fields = [
@@ -33,6 +34,8 @@ class AuthenticationService:
             raise ValueError("Invalid email address")
         if self.user_repository.exists_by_email(email):
             raise ValueError("Email already registered")
+        if any(user.email == email for user in self.pending_users.values()):
+            raise ValueError("OTP verification already pending")
         if not self.password_service.validate_password_strength(data["password"]):
             raise ValueError("Password must be at least 8 characters and include letters and numbers")
 
@@ -48,9 +51,8 @@ class AuthenticationService:
             target_gate_year=int(data["target_gate_year"]),
             user_profile=UserProfile(profile_id=str(uuid4())),
         )
-        self.user_repository.save(user)
         self.verification_service.send_otp(user)
-        self.verification_service.send_verification(user)
+        self.pending_users[user.user_id] = user
         return user
 
     def authenticate_user(self, email: str, password: str) -> dict:
@@ -107,21 +109,17 @@ class AuthenticationService:
         self.user_repository.update(user)
         return True
 
-    def verify_email(self, token: str) -> bool:
-        user_id = self.verification_service.verify_email_token(token)
-        if not user_id:
-            return False
-        user = self.user_repository.find_by_id(user_id)
-        if not user:
-            return False
-        user.activate()
-        self.user_repository.update(user)
-        return True
-
     def verify_otp(self, otp: str) -> User:
         user_id = self.verification_service.verify_otp(otp)
         if not user_id:
             raise ValueError("Invalid or expired OTP")
+
+        pending_user = self.pending_users.pop(user_id, None)
+        if pending_user:
+            pending_user.activate()
+            self.user_repository.save(pending_user)
+            return pending_user
+
         user = self.user_repository.find_by_id(user_id)
         if not user:
             raise ValueError("User not found")

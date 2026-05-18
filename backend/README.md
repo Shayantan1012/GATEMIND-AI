@@ -27,7 +27,6 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 - `POST /api/auth/forgot-password`
 - `POST /api/auth/reset-password`
 - `POST /api/auth/verify-otp`
-- `POST /api/auth/verify-email`
 - `POST /api/auth/refresh-token`
 - `GET /api/users/profile`
 - `PUT /api/users/profile`
@@ -39,12 +38,18 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 This version uses a MongoDB-backed repository for persistence. Set `MONGO_URI` and `MONGO_DB_NAME` in the environment to configure the MongoDB connection.
 
-Email delivery is supported via environment variables:
+SMS OTP delivery is supported via Twilio environment variables:
 
-- `EMAIL_SMTP_HOST`
-- `EMAIL_SMTP_PORT`
-- `EMAIL_SMTP_USERNAME`
-- `EMAIL_SMTP_PASSWORD`
-- `EMAIL_FROM_ADDRESS`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_FROM_NUMBER`
 
-If SMTP variables are not set, email output will be printed to the console for development and testing.
+Example Twilio settings:
+
+```env
+TWILIO_ACCOUNT_SID=your-twilio-account-sid
+TWILIO_AUTH_TOKEN=your-twilio-auth-token
+TWILIO_FROM_NUMBER=+1234567890
+```
+
+If Twilio variables are not set, SMS output will be printed to the console for development and testing.

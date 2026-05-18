@@ -63,15 +63,6 @@ def verify_otp():
         return error_response(str(error), 400)
 
 
-@auth_bp.post("/verify-email")
-def verify_email():
-    payload = request.get_json(silent=True) or {}
-    verified = get_auth_service().verify_email(payload.get("token", ""))
-    if not verified:
-        return error_response("Invalid or expired verification token", 400)
-    return success_response(message="Email verified")
-
-
 @auth_bp.post("/refresh-token")
 def refresh_token():
     payload = request.get_json(silent=True) or {}
