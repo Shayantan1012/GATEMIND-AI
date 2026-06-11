@@ -11,6 +11,11 @@ app/
   repositories/      MongoDB repository adapters
   services/
     admin/            Admin auth, audit logging, dashboard
+    auth/             User authentication service
+    notifications/    Email and SMS notification adapters
+    security/         Email validation, password hashing, JWT
+    users/            User profile service
+    verification/     OTP and email verification strategies
     mocktest/         One-file services and evaluation_strategies/
     rag/
       parsers/        One parser class per file

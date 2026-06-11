@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from app.models.admin import Admin
 from app.models.session import Session
-from app.services.check_email import CheckEmail
+from app.services.security.check_email import CheckEmail
 
 
 class AdminAuthService:

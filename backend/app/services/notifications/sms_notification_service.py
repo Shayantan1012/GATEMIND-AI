@@ -10,14 +10,7 @@ class SMSNotificationService:
     def send_sms(self, to_number: str, body: str) -> bool:
         if self.account_sid and self.auth_token and self.from_number:
             try:
-                payload = parse.urlencode(
-                    {
-                        "From": self.from_number,
-                        "To": to_number,
-                        "Body": body,
-                    }
-                ).encode()
-
+                payload = parse.urlencode({"From": self.from_number, "To": to_number, "Body": body}).encode()
                 api_request = request.Request(
                     f"https://api.twilio.com/2010-04-01/Accounts/{self.account_sid}/Messages.json",
                     data=payload,

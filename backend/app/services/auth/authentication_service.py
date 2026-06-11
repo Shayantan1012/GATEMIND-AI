@@ -5,7 +5,7 @@ from app.models.enums import Branch
 from app.models.session import Session
 from app.models.user import User
 from app.models.user_profile import UserProfile
-from app.services.check_email import CheckEmail
+from app.services.security.check_email import CheckEmail
 
 
 class AuthenticationService:
@@ -17,14 +17,7 @@ class AuthenticationService:
         self.pending_users = {}
 
     def register_user(self, data: dict) -> User:
-        required_fields = [
-            "full_name",
-            "email",
-            "password",
-            "mobile_number",
-            "branch",
-            "target_gate_year",
-        ]
+        required_fields = ["full_name", "email", "password", "mobile_number", "branch", "target_gate_year"]
         missing = [field for field in required_fields if not data.get(field)]
         if missing:
             raise ValueError(f"Missing required fields: {', '.join(missing)}")
@@ -97,14 +90,11 @@ class AuthenticationService:
         user_id = self.verification_service.verify_otp(otp)
         if not user_id:
             raise ValueError("Invalid or expired OTP")
-
         if not self.password_service.validate_password_strength(new_password):
             raise ValueError("Password must be at least 8 characters and include letters and numbers")
-
         user = self.user_repository.find_by_id(user_id)
         if not user:
             raise ValueError("User not found")
-
         user.password_hash = self.password_service.hash_password(new_password)
         self.user_repository.update(user)
         return True

@@ -16,15 +16,15 @@ from app.repositories.mongo_rag_repository import MongoRAGRepository
 from app.services.admin.admin_auth_service import AdminAuthService
 from app.services.admin.admin_dashboard_service import AdminDashboardService
 from app.services.admin.audit_logger import AuditLogger
-from app.services.auth_service import AuthenticationService
-from app.services.jwt_service import JWTService
+from app.services.auth.authentication_service import AuthenticationService
+from app.services.security.jwt_service import JWTService
 from app.services.mocktest.mock_test_application_service import MockTestService
 from app.services.mocktest.performance_analyzer import PerformanceAnalyzer
 from app.services.mocktest.personalized_rag_updater import PersonalizedRAGUpdater
 from app.services.mocktest.question_bank_service import QuestionBankService
 from app.services.mocktest.question_evaluator import QuestionEvaluator
-from app.services.otp_verification_service import OTPVerificationService
-from app.services.password_service import PasswordService
+from app.services.security.password_service import PasswordService
+from app.services.verification.otp_verification_service import OTPVerificationService
 from app.services.rag.chunking.recursive_chunking_strategy import RecursiveChunkingStrategy
 from app.services.rag.context_builder import ContextBuilder
 from app.services.rag.embeddings.embedding_factory import EmbeddingFactory
@@ -35,8 +35,8 @@ from app.services.rag.rag_chat_service import RAGChatService
 from app.services.rag.retrievers.hybrid_reranker import HybridReranker
 from app.services.rag.retrievers.hybrid_retriever import HybridRetriever
 from app.services.rag.vectorstores.mongo_vector_store_adapter import MongoVectorStoreAdapter
-from app.services.sms_notification_service import SMSNotificationService
-from app.services.user_service import UserService
+from app.services.notifications.sms_notification_service import SMSNotificationService
+from app.services.users.user_service import UserService
 
 
 def create_app(config_class=Config, database=None):

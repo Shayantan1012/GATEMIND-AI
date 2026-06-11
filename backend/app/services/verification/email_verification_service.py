@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from app.services.email_verification_strategy import VerificationStrategy
+from app.services.verification.verification_strategy import VerificationStrategy
 
 
 class EmailVerificationService(VerificationStrategy):

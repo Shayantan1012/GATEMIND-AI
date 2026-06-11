@@ -35,14 +35,7 @@ class JWTService:
             role=payload.get("role"),
         )
 
-    def _encode(
-        self,
-        user_id: str,
-        token_type: str,
-        expires_delta: timedelta,
-        subject_type: str = "user",
-        role: str | None = None,
-    ) -> str:
+    def _encode(self, user_id: str, token_type: str, expires_delta: timedelta, subject_type: str = "user", role: str | None = None) -> str:
         now = datetime.now(timezone.utc)
         payload = {
             "sub": user_id,
