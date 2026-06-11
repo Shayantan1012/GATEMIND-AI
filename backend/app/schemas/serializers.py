@@ -24,3 +24,32 @@ def serialize_user(user):
         "account_status": user.account_status.value,
         "profile": serialize_profile(user.user_profile),
     }
+
+
+def serialize_admin(admin):
+    return {
+        "admin_id": admin.admin_id,
+        "full_name": admin.full_name,
+        "email": admin.email,
+        "phone_number": admin.phone_number,
+        "role": admin.role.value,
+        "account_status": admin.account_status.value,
+        "is_verified": admin.is_verified,
+    }
+
+
+def serialize_question(question, include_answer=False):
+    data = question.to_dict()
+    data["question_id"] = data.pop("_id")
+    data["created_at"] = data["created_at"].isoformat()
+    if not include_answer:
+        data.pop("correct_answer", None)
+        data.pop("explanation", None)
+    return data
+
+
+def serialize_mock_test(mock_test):
+    data = mock_test.to_dict()
+    data["mock_test_id"] = data.pop("_id")
+    data["created_at"] = data["created_at"].isoformat()
+    return data

@@ -1,6 +1,30 @@
 # GATEMIND AI Backend
 
-Flask backend structured around the authentication and user-management classes from the provided diagram.
+Modular Flask backend for authentication, administration, mock tests, performance analytics, and LangChain RAG.
+
+## Architecture
+
+```text
+app/
+  controllers/       Flask blueprints and HTTP concerns
+  models/            Domain entities and factories
+  repositories/      MongoDB repository adapters
+  services/
+    admin/            Admin auth, audit logging, dashboard
+    mocktest/         Evaluation strategies and performance analysis
+    rag/              Document parsing, chunking, embeddings, retrieval, LLM
+  schemas/            API serializers
+  utils/              Authentication middleware and API responses
+```
+
+The implementation follows the supplied diagram:
+
+- Factory: question creation, document parsers, embedding provider selection
+- Strategy: question evaluation, document chunking
+- Adapter: Mongo repositories and Mongo vector-store adapter
+- Template Method: RAG indexing pipeline
+- Builder: RAG context construction
+- Observer-style update: mock-test performance updates the user learning profile
 
 ## Setup
 
@@ -8,48 +32,68 @@ Flask backend structured around the authentication and user-management classes f
 cd backend
 .\..\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
 python run.py
 ```
 
-If PowerShell rejects the activation script, run:
+For development without a running MongoDB server:
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\..\.venv\Scripts\Activate.ps1
+```env
+MONGO_USE_MOCK=true
 ```
 
-## Endpoints
+For persistent storage, keep `MONGO_USE_MOCK=false` and run MongoDB at `MONGO_URI`.
 
-- `GET /api/health`
+When `OPENAI_API_KEY` is empty, RAG uses local deterministic embeddings and returns retrieved context.
+When it is configured, LangChain uses OpenAI embeddings and the configured chat model.
+
+## Main API
+
+### Users
+
 - `POST /api/auth/register`
+- `POST /api/auth/verify-otp`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `POST /api/auth/forgot-password`
 - `POST /api/auth/reset-password`
-- `POST /api/auth/verify-otp`
 - `POST /api/auth/refresh-token`
-- `GET /api/users/profile`
-- `PUT /api/users/profile`
-- `POST /api/users/change-password`
+- `GET|PUT /api/users/profile`
 - `GET /api/users/progress`
-- `GET /api/users/mock-test-history`
 
-## Notes
+### Admin
 
-This version uses a MongoDB-backed repository for persistence. Set `MONGO_URI` and `MONGO_DB_NAME` in the environment to configure the MongoDB connection.
+- `POST /api/admin/auth/register`
+- `POST /api/admin/auth/login`
+- `POST /api/admin/auth/logout`
+- `POST /api/admin/auth/refresh-token`
+- `GET /api/admin/dashboard`
+- `GET /api/admin/users`
+- `POST|GET /api/admin/questions`
+- `POST /api/admin/mock-tests`
+- `POST /api/admin/mock-tests/<id>/publish`
+- `POST|GET /api/admin/rag/documents`
 
-SMS OTP delivery is supported via Twilio environment variables:
+The first admin can register directly. Later registrations require `X-Admin-Bootstrap-Token` matching `ADMIN_BOOTSTRAP_TOKEN`.
 
-- `TWILIO_ACCOUNT_SID`
-- `TWILIO_AUTH_TOKEN`
-- `TWILIO_FROM_NUMBER`
+### Mock Tests
 
-Example Twilio settings:
+- `GET /api/mock-tests`
+- `GET /api/mock-tests/<id>`
+- `POST /api/mock-tests/<id>/submit`
+- `GET /api/mock-tests/history`
 
-```env
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_FROM_NUMBER=+1234567890
+### RAG
+
+- `POST /api/rag/chat`
+- `GET /api/rag/history`
+
+Supported uploads: PDF, TXT, Markdown, CSV, JSON, PNG, JPG, JPEG, and WebP. Image OCR is enabled when Pillow and Tesseract are installed.
+
+## Tests
+
+```powershell
+python -m unittest discover -s tests -v
 ```
 
-If Twilio variables are not set, SMS output will be printed to the console for development and testing.
+The integration test covers admin creation, question bank, mock-test publishing, user OTP verification, submission/evaluation, performance personalization, document indexing, RAG retrieval, citations, and dashboard analytics.

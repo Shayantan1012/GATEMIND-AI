@@ -22,6 +22,12 @@ class UserRepository:
     def exists_by_email(self, email: str) -> bool:
         raise NotImplementedError
 
+    def find_all(self, limit: int = 100, skip: int = 0) -> list[User]:
+        raise NotImplementedError
+
+    def count(self) -> int:
+        raise NotImplementedError
+
 
 class InMemoryUserRepository(UserRepository):
     def __init__(self):
@@ -61,3 +67,9 @@ class InMemoryUserRepository(UserRepository):
                 if session.refresh_token == refresh_token:
                     return user
         return None
+
+    def find_all(self, limit: int = 100, skip: int = 0) -> list[User]:
+        return list(self._users_by_id.values())[skip : skip + limit]
+
+    def count(self) -> int:
+        return len(self._users_by_id)

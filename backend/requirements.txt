@@ -3,3 +3,8 @@ PyJWT==2.8.0
 Werkzeug==3.0.3
 python-dotenv==1.0.1
 pymongo>=4.5,<5
+langchain-core>=0.3,<2
+langchain-text-splitters>=0.3,<2
+langchain-openai>=0.3,<2
+pypdf>=5,<7
+mongomock>=4.3,<5

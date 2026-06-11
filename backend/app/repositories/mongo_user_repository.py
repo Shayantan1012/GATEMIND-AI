@@ -38,3 +38,9 @@ class MongoUserRepository(UserRepository):
     def find_by_refresh_token(self, refresh_token: str):
         doc = self.collection.find_one({"sessions.refresh_token": refresh_token})
         return User.from_dict(doc) if doc else None
+
+    def find_all(self, limit: int = 100, skip: int = 0) -> list[User]:
+        return [User.from_dict(doc) for doc in self.collection.find().skip(skip).limit(limit)]
+
+    def count(self) -> int:
+        return self.collection.count_documents({})

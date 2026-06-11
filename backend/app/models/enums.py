@@ -16,3 +16,23 @@ class Branch(str, Enum):
     ME = "ME"
     CE = "CE"
     OTHER = "OTHER"
+
+
+class AdminRole(str, Enum):
+    SUPER_ADMIN = "SUPER_ADMIN"
+    CONTENT_ADMIN = "CONTENT_ADMIN"
+    MOCKTEST_ADMIN = "MOCKTEST_ADMIN"
+    ANALYTICS_ADMIN = "ANALYTICS_ADMIN"
+    SUPPORT_ADMIN = "SUPPORT_ADMIN"
+
+
+class QuestionType(str, Enum):
+    MCQ = "MCQ"
+    MSQ = "MSQ"
+    NAT = "NAT"
+
+
+class QueryType(str, Enum):
+    TEXT = "TEXT"
+    IMAGE = "IMAGE"
+    HYBRID = "HYBRID"
