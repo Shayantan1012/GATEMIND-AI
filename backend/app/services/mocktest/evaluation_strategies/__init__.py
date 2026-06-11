@@ -2,6 +2,5 @@ from app.services.mocktest.evaluation_strategies.evaluation_strategy import Eval
 from app.services.mocktest.evaluation_strategies.mcq_evaluation_strategy import MCQEvaluationStrategy
 from app.services.mocktest.evaluation_strategies.msq_evaluation_strategy import MSQEvaluationStrategy
 from app.services.mocktest.evaluation_strategies.nat_evaluation_strategy import NATEvaluationStrategy
-from app.services.mocktest.question_evaluator import QuestionEvaluator
 
-__all__ = ["EvaluationStrategy", "MCQEvaluationStrategy", "MSQEvaluationStrategy", "NATEvaluationStrategy", "QuestionEvaluator"]
+__all__ = ["EvaluationStrategy", "MCQEvaluationStrategy", "MSQEvaluationStrategy", "NATEvaluationStrategy"]

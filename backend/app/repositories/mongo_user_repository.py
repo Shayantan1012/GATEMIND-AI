@@ -1,7 +1,7 @@
 from pymongo.database import Database
 
 from app.models.user import User
-from app.repositories.user_repository import UserRepository
+from app.repositories.user_repository_interface import UserRepository
 
 
 class MongoUserRepository(UserRepository):

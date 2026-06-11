@@ -11,11 +11,19 @@ app/
   repositories/      MongoDB repository adapters
   services/
     admin/            Admin auth, audit logging, dashboard
-    mocktest/         Evaluation strategies and performance analysis
-    rag/              Document parsing, chunking, embeddings, retrieval, LLM
+    mocktest/         One-file services and evaluation_strategies/
+    rag/
+      parsers/        One parser class per file
+      chunking/       One chunking strategy per file
+      embeddings/     Embedding implementations and factory
+      vectorstores/   Vector-store interface and adapters
+      retrievers/     Retriever interface, implementations, rerankers
+      indexing/       Indexing template and concrete pipeline
   schemas/            API serializers
   utils/              Authentication middleware and API responses
 ```
+
+Every domain/service/repository class has its own file. Import-only facade modules remain for backward compatibility.
 
 The implementation follows the supplied diagram:
 
