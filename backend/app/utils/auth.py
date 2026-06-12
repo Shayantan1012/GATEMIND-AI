@@ -63,6 +63,8 @@ def admin_required(*allowed_roles):
             admin = services["admins_repo"].find_by_id(payload["sub"])
             if not admin:
                 return error_response("Admin not found", 401)
+            if admin.account_status.value != "ACTIVE":
+                return error_response("Admin account is not active", 403)
             if allowed_roles and admin.role.value not in allowed_roles and admin.role.value != "SUPER_ADMIN":
                 return error_response("Insufficient admin permissions", 403)
             return view(admin, *args, **kwargs)

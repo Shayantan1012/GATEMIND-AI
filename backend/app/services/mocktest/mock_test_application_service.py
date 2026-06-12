@@ -20,7 +20,7 @@ class MockTestService:
         by_id = {question.question_id: question for question in questions}
         return {"mock_test": mock_test, "questions": [by_id[item].public_dict() for item in mock_test.question_ids if item in by_id]}
 
-    def submit(self, user_id, mock_test_id, answers):
+    def submit(self, user_id, mock_test_id, answers, time_taken_seconds=0):
         test = self.get_test(mock_test_id)["mock_test"]
         submitted = {str(item.get("question_id")): item.get("answer") for item in answers}
         questions = self.questions.find_questions(question_ids=test.question_ids)
@@ -35,6 +35,8 @@ class MockTestService:
             unanswered_count=sum(not item["answered"] for item in results),
             subject_breakdown=self.analyzer.analyze(results),
             answers=results,
+            mock_test_title=test.title,
+            time_taken_seconds=max(0, min(int(time_taken_seconds or 0), test.duration_minutes * 60)),
         )
         self.performance.save(record)
         self.profile_updater.update(user_id, record)

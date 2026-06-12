@@ -19,6 +19,15 @@ class Config:
         "UPLOAD_FOLDER",
         str(Path(__file__).resolve().parents[1] / "uploads"),
     )
+    LOG_FOLDER = os.getenv(
+        "LOG_FOLDER",
+        str(Path(UPLOAD_FOLDER) / "logs"),
+    )
+    TEST_OUTPUT_FOLDER = os.getenv(
+        "TEST_OUTPUT_FOLDER",
+        str(Path(UPLOAD_FOLDER) / "test-output"),
+    )
+    ENABLE_FILE_LOGGING = os.getenv("ENABLE_FILE_LOGGING", "true").lower() == "true"
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(25 * 1024 * 1024)))
 
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")

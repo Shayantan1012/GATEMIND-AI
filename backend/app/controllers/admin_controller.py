@@ -4,7 +4,12 @@ from uuid import uuid4
 from flask import Blueprint, current_app, request
 from werkzeug.utils import secure_filename
 
-from app.schemas.serializers import serialize_admin, serialize_mock_test, serialize_question
+from app.schemas.serializers import (
+    serialize_admin,
+    serialize_mock_test,
+    serialize_mock_test_with_questions,
+    serialize_question,
+)
 from app.utils.auth import admin_required
 from app.utils.responses import error_response, success_response
 
@@ -78,8 +83,11 @@ def dashboard(current_admin):
 @admin_bp.get("/users")
 @admin_required("ANALYTICS_ADMIN", "SUPPORT_ADMIN")
 def users_overview(current_admin):
-    limit = min(int(request.args.get("limit", 50)), 200)
-    skip = max(int(request.args.get("skip", 0)), 0)
+    try:
+        limit = min(max(int(request.args.get("limit", 50)), 1), 200)
+        skip = max(int(request.args.get("skip", 0)), 0)
+    except ValueError:
+        return error_response("limit and skip must be integers", 400)
     return success_response(services()["admin_dashboard"].users_overview(limit, skip))
 
 
@@ -111,9 +119,35 @@ def create_mock_test(current_admin):
             request.get_json(silent=True) or {},
             current_admin.admin_id,
         )
-        return success_response(serialize_mock_test(mock_test), "Mock test created", 201)
+        questions = services()["question_bank"].get_mock_test_questions(mock_test)
+        return success_response(serialize_mock_test_with_questions(mock_test, questions), "Mock test created", 201)
     except (ValueError, KeyError) as error:
         return error_response(str(error), 400)
+
+
+@admin_bp.get("/mock-tests")
+@admin_required("MOCKTEST_ADMIN", "ANALYTICS_ADMIN")
+def list_mock_tests(current_admin):
+    mock_tests = services()["question_bank"].list_mock_tests()
+    return success_response(
+        [serialize_mock_test_with_questions(item, services()["question_bank"].get_mock_test_questions(item)) for item in mock_tests]
+    )
+
+
+@admin_bp.put("/mock-tests/<mock_test_id>")
+@admin_required("MOCKTEST_ADMIN")
+def update_mock_test(current_admin, mock_test_id):
+    try:
+        mock_test = services()["question_bank"].update_mock_test(
+            mock_test_id,
+            request.get_json(silent=True) or {},
+            current_admin.admin_id,
+        )
+        questions = services()["question_bank"].get_mock_test_questions(mock_test)
+        return success_response(serialize_mock_test_with_questions(mock_test, questions), "Mock test updated")
+    except ValueError as error:
+        status_code = 404 if str(error) == "Mock test not found" else 400
+        return error_response(str(error), status_code)
 
 
 @admin_bp.post("/mock-tests/<mock_test_id>/publish")
@@ -122,6 +156,16 @@ def publish_mock_test(current_admin, mock_test_id):
     try:
         mock_test = services()["question_bank"].publish_mock_test(mock_test_id)
         return success_response(serialize_mock_test(mock_test), "Mock test published")
+    except ValueError as error:
+        return error_response(str(error), 404)
+
+
+@admin_bp.delete("/mock-tests/<mock_test_id>")
+@admin_required("MOCKTEST_ADMIN")
+def delete_mock_test(current_admin, mock_test_id):
+    try:
+        services()["question_bank"].delete_mock_test(mock_test_id)
+        return success_response(message="Mock test deleted")
     except ValueError as error:
         return error_response(str(error), 404)
 
@@ -137,11 +181,18 @@ def upload_rag_document(current_admin):
     target.parent.mkdir(parents=True, exist_ok=True)
     uploaded_file.save(target)
     try:
+        description = request.form.get("description", "")
         document = services()["rag_indexer"].execute(
             target,
             current_admin.admin_id,
-            {"subject": request.form.get("subject", ""), "original_name": uploaded_file.filename},
+            {
+                "subject": request.form.get("subject", ""),
+                "description": description,
+                "original_name": uploaded_file.filename,
+            },
         )
+        document["description"] = description
+        services()["rag_repo"].save_document(document)
         document["uploaded_at"] = document["uploaded_at"].isoformat()
         return success_response(document, "Document indexed", 201)
     except ValueError as error:
@@ -156,3 +207,23 @@ def list_rag_documents(current_admin):
         if hasattr(document.get("uploaded_at"), "isoformat"):
             document["uploaded_at"] = document["uploaded_at"].isoformat()
     return success_response(documents)
+
+
+@admin_bp.delete("/rag/documents/<document_id>")
+@admin_required("CONTENT_ADMIN")
+def delete_rag_document(current_admin, document_id):
+    document = services()["rag_repo"].find_document(document_id)
+    if not document:
+        return error_response("Document not found", 404)
+    services()["rag_repo"].delete_document(document_id)
+    return success_response(message="Document deleted")
+
+
+@admin_bp.delete("/maintenance/storage")
+@admin_required("SUPER_ADMIN")
+def clear_logs_and_uploaded_documents(current_admin):
+    try:
+        result = services()["storage_maintenance"].clear_logs_and_uploaded_documents()
+        return success_response(result, "Logs and uploaded study documents cleared")
+    except (OSError, ValueError) as error:
+        return error_response(str(error), 500)

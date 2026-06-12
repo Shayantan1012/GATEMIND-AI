@@ -109,7 +109,11 @@ Supported uploads: PDF, TXT, Markdown, CSV, JSON, PNG, JPG, JPEG, and WebP. Imag
 ## Tests
 
 ```powershell
-python -m unittest discover -s tests -v
+python run_tests.py
 ```
+
+Runtime logs are stored in `uploads/logs/server.log` and `uploads/logs/server.err`.
+Test output from `run_tests.py` is stored in `uploads/test-output/latest-tests.log`.
+These files remain until a super admin uses the storage cleanup action.
 
 The integration test covers admin creation, question bank, mock-test publishing, user OTP verification, submission/evaluation, performance personalization, document indexing, RAG retrieval, citations, and dashboard analytics.

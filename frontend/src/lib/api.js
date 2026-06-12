@@ -38,6 +38,11 @@ export const api = {
 
   getProfile: (token) => request("/api/users/profile", { headers: authHeaders(token) }),
   updateProfile: (token, data) => request("/api/users/profile", { method: "PUT", headers: authHeaders(token), body: data }),
+  uploadProfileImage: (token, file) => {
+    const formData = new FormData();
+    formData.append("image", file);
+    return request("/api/users/profile/image", { method: "POST", headers: authHeaders(token), body: formData });
+  },
   changePassword: (token, data) => request("/api/users/change-password", { method: "POST", headers: authHeaders(token), body: data }),
   getProgress: (token) => request("/api/users/progress", { headers: authHeaders(token) }),
 
@@ -53,17 +58,37 @@ export const api = {
   createQuestion: (token, data) => request("/api/admin/questions", { method: "POST", headers: authHeaders(token), body: data }),
   listQuestions: (token) => request("/api/admin/questions", { headers: authHeaders(token) }),
   createMockTest: (token, data) => request("/api/admin/mock-tests", { method: "POST", headers: authHeaders(token), body: data }),
+  listAdminMockTests: (token) => request("/api/admin/mock-tests", { headers: authHeaders(token) }),
+  updateMockTest: (token, id, data) => request(`/api/admin/mock-tests/${id}`, { method: "PUT", headers: authHeaders(token), body: data }),
+  deleteMockTest: (token, id) => request(`/api/admin/mock-tests/${id}`, { method: "DELETE", headers: authHeaders(token) }),
   publishMockTest: (token, id) => request(`/api/admin/mock-tests/${id}/publish`, { method: "POST", headers: authHeaders(token) }),
   uploadDocument: (token, formData) => request("/api/admin/rag/documents", { method: "POST", headers: authHeaders(token), body: formData }),
   listDocuments: (token) => request("/api/admin/rag/documents", { headers: authHeaders(token) }),
+  deleteDocument: (token, id) => request(`/api/admin/rag/documents/${id}`, { method: "DELETE", headers: authHeaders(token) }),
+  clearAdminStorage: (token) => request("/api/admin/maintenance/storage", { method: "DELETE", headers: authHeaders(token) }),
 
   listMockTests: (token) => request("/api/mock-tests", { headers: authHeaders(token) }),
   getMockTest: (token, id) => request(`/api/mock-tests/${id}`, { headers: authHeaders(token) }),
-  submitMockTest: (token, id, answers) => request(`/api/mock-tests/${id}/submit`, { method: "POST", headers: authHeaders(token), body: { answers } }),
+  submitMockTest: (token, id, answers, timeTakenSeconds = 0) =>
+    request(`/api/mock-tests/${id}/submit`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body: { answers, time_taken_seconds: timeTakenSeconds },
+    }),
   mockHistory: (token) => request("/api/mock-tests/history", { headers: authHeaders(token) }),
 
-  askRag: (token, query, filters) => request("/api/rag/chat", { method: "POST", headers: authHeaders(token), body: { query, filters } }),
+  askRag: (token, query, filters, conversationId) =>
+    request("/api/rag/chat", {
+      method: "POST",
+      headers: authHeaders(token),
+      body: { query, filters, conversation_id: conversationId },
+    }),
   ragHistory: (token) => request("/api/rag/history", { headers: authHeaders(token) }),
+  createRagConversation: (token, title = "New chat") =>
+    request("/api/rag/conversations", { method: "POST", headers: authHeaders(token), body: { title } }),
+  listRagConversations: (token) => request("/api/rag/conversations", { headers: authHeaders(token) }),
+  getRagConversationMessages: (token, id) => request(`/api/rag/conversations/${id}/messages`, { headers: authHeaders(token) }),
+  deleteRagConversation: (token, id) => request(`/api/rag/conversations/${id}`, { method: "DELETE", headers: authHeaders(token) }),
   listRagDocuments: (token) => request("/api/rag/documents", { headers: authHeaders(token) }),
   uploadRagFiles: (token, files) => {
     const formData = new FormData();

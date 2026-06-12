@@ -4,10 +4,12 @@ import {
   FileUp,
   LayoutDashboard,
   LogOut,
+  Menu,
   MessageSquareText,
   ShieldCheck,
   Sparkles,
   UserRound,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -31,6 +33,7 @@ export default function App() {
   const { user, admin } = useSelector((state) => state.auth);
   const [activeView, setActiveView] = useState("profile");
   const [health, setHealth] = useState("checking");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     api
@@ -39,11 +42,25 @@ export default function App() {
       .catch(() => setHealth("offline"));
   }, []);
 
+  useEffect(() => {
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setSidebarOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
+
   const ActiveIcon = NAV_ITEMS.find((item) => item.id === activeView)?.icon || LayoutDashboard;
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={sidebarOpen ? "app-shell sidebar-open" : "app-shell"}>
+      <button
+        className="sidebar-backdrop"
+        type="button"
+        aria-label="Close navigation"
+        onClick={() => setSidebarOpen(false)}
+      />
+      <aside className="sidebar" aria-hidden={!sidebarOpen}>
         <div className="brand">
           <div className="brand-mark">
             <BrainCircuit size={26} />
@@ -52,6 +69,15 @@ export default function App() {
             <p>GATEMIND</p>
             <span>AI Backend Console</span>
           </div>
+          <button
+            className="sidebar-close"
+            type="button"
+            title="Close navigation"
+            aria-label="Close navigation"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X size={19} />
+          </button>
         </div>
 
         <nav className="nav-list">
@@ -61,7 +87,10 @@ export default function App() {
               <button
                 key={item.id}
                 className={activeView === item.id ? "nav-item active" : "nav-item"}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => {
+                  setActiveView(item.id);
+                  setSidebarOpen(false);
+                }}
                 type="button"
               >
                 <Icon size={18} />
@@ -79,11 +108,23 @@ export default function App() {
 
       <main className="workspace">
         <header className="topbar">
-          <div>
+          <div className="topbar-heading">
+            <button
+              className="menu-button"
+              type="button"
+              title="Open navigation"
+              aria-label="Open navigation"
+              aria-expanded={sidebarOpen}
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={21} />
+            </button>
+            <div>
             <p className="eyebrow">
               <ActiveIcon size={15} /> {activeView}
             </p>
             <h1>Gate preparation operations, in one place.</h1>
+            </div>
           </div>
           <div className="session-strip">
             <span>{user ? user.profile.full_name : "No student session"}</span>

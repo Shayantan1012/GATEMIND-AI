@@ -21,6 +21,22 @@ def serialize_document(document):
     return result
 
 
+def serialize_conversation(conversation):
+    result = dict(conversation)
+    result["conversation_id"] = result.pop("_id")
+    for field in ("created_at", "updated_at"):
+        if hasattr(result.get(field), "isoformat"):
+            result[field] = result[field].isoformat()
+    return result
+
+
+def serialize_chat(chat):
+    result = dict(chat)
+    if hasattr(result.get("created_at"), "isoformat"):
+        result["created_at"] = result["created_at"].isoformat()
+    return result
+
+
 @rag_bp.post("/documents")
 @token_required
 def upload_documents(current_user):
@@ -67,21 +83,59 @@ def list_user_documents(current_user):
 def chat(current_user):
     payload = request.get_json(silent=True) or {}
     try:
-        response = service().ask(
+        response, conversation = service().ask(
             current_user.user_id,
             payload.get("query", ""),
             payload.get("filters"),
+            payload.get("conversation_id"),
         )
-        return success_response(response.to_dict())
+        return success_response(
+            {
+                **response.to_dict(),
+                "conversation": serialize_conversation(conversation),
+            }
+        )
     except ValueError as error:
         return error_response(str(error), 400)
+
+
+@rag_bp.post("/conversations")
+@token_required
+def create_conversation(current_user):
+    payload = request.get_json(silent=True) or {}
+    return success_response(
+        serialize_conversation(service().create_conversation(current_user.user_id, payload.get("title", "New chat"))),
+        "Conversation created",
+        201,
+    )
+
+
+@rag_bp.get("/conversations")
+@token_required
+def list_conversations(current_user):
+    return success_response([serialize_conversation(item) for item in service().conversations(current_user.user_id)])
+
+
+@rag_bp.get("/conversations/<conversation_id>/messages")
+@token_required
+def conversation_messages(current_user, conversation_id):
+    try:
+        return success_response([serialize_chat(item) for item in service().history(current_user.user_id, conversation_id)])
+    except ValueError as error:
+        return error_response(str(error), 404)
 
 
 @rag_bp.get("/history")
 @token_required
 def chat_history(current_user):
-    history = service().history(current_user.user_id)
-    for item in history:
-        if hasattr(item.get("created_at"), "isoformat"):
-            item["created_at"] = item["created_at"].isoformat()
-    return success_response(history)
+    return success_response([serialize_chat(item) for item in service().history(current_user.user_id)])
+
+
+@rag_bp.delete("/conversations/<conversation_id>")
+@token_required
+def delete_conversation(current_user, conversation_id):
+    try:
+        service().delete_conversation(current_user.user_id, conversation_id)
+        return success_response(message="Conversation deleted")
+    except ValueError as error:
+        return error_response(str(error), 404)

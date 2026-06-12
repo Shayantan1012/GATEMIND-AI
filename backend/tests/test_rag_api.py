@@ -20,6 +20,7 @@ class RagApiTest(unittest.TestCase):
         uploaded = upload_text_document(self.client, self.admin["access_token"])
         self.assertEqual(uploaded.status_code, 201)
         self.assertGreater(uploaded.json["data"]["chunk_count"], 0)
+        self.assertEqual(uploaded.json["data"]["description"], "Clustering notes")
 
         documents = self.client.get("/api/admin/rag/documents", headers=auth_header(self.admin["access_token"]))
         self.assertEqual(documents.status_code, 200)
@@ -37,6 +38,21 @@ class RagApiTest(unittest.TestCase):
         self.assertEqual(history.status_code, 200)
         self.assertEqual(len(history.json["data"]), 1)
 
+    def test_admin_can_delete_indexed_document(self):
+        uploaded = upload_text_document(self.client, self.admin["access_token"])
+        self.assertEqual(uploaded.status_code, 201)
+        document_id = uploaded.json["data"]["_id"]
+
+        deleted = self.client.delete(
+            f"/api/admin/rag/documents/{document_id}",
+            headers=auth_header(self.admin["access_token"]),
+        )
+        self.assertEqual(deleted.status_code, 200)
+
+        documents = self.client.get("/api/admin/rag/documents", headers=auth_header(self.admin["access_token"]))
+        self.assertEqual(documents.status_code, 200)
+        self.assertEqual(len(documents.json["data"]), 0)
+
     def test_empty_rag_query_returns_400(self):
         response = self.client.post(
             "/api/rag/chat",
@@ -44,6 +60,74 @@ class RagApiTest(unittest.TestCase):
             json={"query": ""},
         )
         self.assertEqual(response.status_code, 400)
+
+    def test_user_can_create_switch_and_delete_conversations(self):
+        headers = auth_header(self.student["access_token"])
+        first = self.client.post("/api/rag/conversations", headers=headers, json={"title": "BIRCH study"})
+        second = self.client.post("/api/rag/conversations", headers=headers, json={"title": "Networks study"})
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 201)
+        first_id = first.json["data"]["conversation_id"]
+        second_id = second.json["data"]["conversation_id"]
+
+        first_chat = self.client.post(
+            "/api/rag/chat",
+            headers=headers,
+            json={"conversation_id": first_id, "query": "Explain BIRCH"},
+        )
+        second_chat = self.client.post(
+            "/api/rag/chat",
+            headers=headers,
+            json={"conversation_id": second_id, "query": "Explain TCP"},
+        )
+        self.assertEqual(first_chat.status_code, 200)
+        self.assertEqual(second_chat.status_code, 200)
+        self.assertEqual(first_chat.json["data"]["conversation"]["conversation_id"], first_id)
+
+        conversations = self.client.get("/api/rag/conversations", headers=headers)
+        self.assertEqual(conversations.status_code, 200)
+        self.assertEqual(len(conversations.json["data"]), 2)
+
+        first_messages = self.client.get(f"/api/rag/conversations/{first_id}/messages", headers=headers)
+        second_messages = self.client.get(f"/api/rag/conversations/{second_id}/messages", headers=headers)
+        self.assertEqual([item["query"] for item in first_messages.json["data"]], ["Explain BIRCH"])
+        self.assertEqual([item["query"] for item in second_messages.json["data"]], ["Explain TCP"])
+
+        deleted = self.client.delete(f"/api/rag/conversations/{first_id}", headers=headers)
+        self.assertEqual(deleted.status_code, 200)
+        missing = self.client.get(f"/api/rag/conversations/{first_id}/messages", headers=headers)
+        self.assertEqual(missing.status_code, 404)
+
+    def test_user_cannot_access_another_users_conversation(self):
+        headers = auth_header(self.student["access_token"])
+        created = self.client.post("/api/rag/conversations", headers=headers, json={"title": "Private chat"})
+        conversation_id = created.json["data"]["conversation_id"]
+        other = register_and_login_student(self.app, self.client, email="conversation-other@example.com")
+        response = self.client.get(
+            f"/api/rag/conversations/{conversation_id}/messages",
+            headers=auth_header(other["access_token"]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_follow_up_uses_selected_conversation_context(self):
+        headers = auth_header(self.student["access_token"])
+        created = self.client.post("/api/rag/conversations", headers=headers, json={"title": "Follow-up context"})
+        conversation_id = created.json["data"]["conversation_id"]
+
+        first = self.client.post(
+            "/api/rag/chat",
+            headers=headers,
+            json={"conversation_id": conversation_id, "query": "Remember that my focus is graph algorithms."},
+        )
+        self.assertEqual(first.status_code, 200)
+
+        follow_up = self.client.post(
+            "/api/rag/chat",
+            headers=headers,
+            json={"conversation_id": conversation_id, "query": "What is my focus?"},
+        )
+        self.assertEqual(follow_up.status_code, 200)
+        self.assertIn("graph algorithms", follow_up.json["data"]["answer"])
 
     def test_unsupported_document_type_returns_400(self):
         response = self.client.post(

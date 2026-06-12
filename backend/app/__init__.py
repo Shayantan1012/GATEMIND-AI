@@ -16,6 +16,7 @@ from app.repositories.mongo_rag_repository import MongoRAGRepository
 from app.services.admin.admin_auth_service import AdminAuthService
 from app.services.admin.admin_dashboard_service import AdminDashboardService
 from app.services.admin.audit_logger import AuditLogger
+from app.services.admin.storage_maintenance_service import StorageMaintenanceService
 from app.services.auth.authentication_service import AuthenticationService
 from app.services.security.jwt_service import JWTService
 from app.services.mocktest.mock_test_application_service import MockTestService
@@ -37,11 +38,13 @@ from app.services.rag.retrievers.hybrid_retriever import HybridRetriever
 from app.services.rag.vectorstores.mongo_vector_store_adapter import MongoVectorStoreAdapter
 from app.services.notifications.sms_notification_service import SMSNotificationService
 from app.services.users.user_service import UserService
+from app.utils.logging_config import configure_file_logging
 
 
 def create_app(config_class=Config, database=None):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    configure_file_logging(app)
 
     if database is None:
 
@@ -84,6 +87,9 @@ def create_app(config_class=Config, database=None):
         performance_repository,
         rag_repository,
     )
+    storage_maintenance_service = StorageMaintenanceService(
+        app.config["UPLOAD_FOLDER"],
+    )
     question_bank_service = QuestionBankService(question_repository)
     mock_test_service = MockTestService(
         question_repository,
@@ -120,6 +126,7 @@ def create_app(config_class=Config, database=None):
         "admins_repo": admin_repository,
         "admin_auth": admin_auth_service,
         "admin_dashboard": admin_dashboard_service,
+        "storage_maintenance": storage_maintenance_service,
         "question_bank": question_bank_service,
         "mock_tests": mock_test_service,
         "rag_indexer": rag_indexer,

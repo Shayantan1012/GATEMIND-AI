@@ -38,7 +38,12 @@ def submit_mock_test(current_user, mock_test_id):
     payload = request.get_json(silent=True) or {}
     try:
         return success_response(
-            service().submit(current_user.user_id, mock_test_id, payload.get("answers", [])),
+            service().submit(
+                current_user.user_id,
+                mock_test_id,
+                payload.get("answers", []),
+                payload.get("time_taken_seconds", 0),
+            ),
             "Mock test evaluated",
         )
     except ValueError as error:

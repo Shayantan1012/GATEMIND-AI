@@ -15,6 +15,8 @@ class PerformanceRecord:
     unanswered_count: int
     subject_breakdown: dict
     answers: list[dict]
+    mock_test_title: str = ""
+    time_taken_seconds: int = 0
     attempted_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
@@ -34,6 +36,8 @@ class PerformanceRecord:
             "unanswered_count": self.unanswered_count,
             "subject_breakdown": self.subject_breakdown,
             "answers": self.answers,
+            "mock_test_title": self.mock_test_title,
+            "time_taken_seconds": self.time_taken_seconds,
             "attempted_at": self.attempted_at,
         }
 

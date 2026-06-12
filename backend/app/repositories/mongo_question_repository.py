@@ -15,6 +15,10 @@ class MongoQuestionRepository:
         data = self.questions.find_one({"_id": question_id})
         return Question.from_dict(data) if data else None
 
+    def delete_question(self, question_id):
+        result = self.questions.delete_one({"_id": question_id})
+        return result.deleted_count > 0
+
     def find_questions(self, question_ids=None, subject=None):
         query = {}
         if question_ids is not None:
@@ -30,6 +34,10 @@ class MongoQuestionRepository:
     def find_mock_test(self, test_id):
         data = self.mock_tests.find_one({"_id": test_id})
         return MockTest.from_dict(data) if data else None
+
+    def delete_mock_test(self, test_id):
+        result = self.mock_tests.delete_one({"_id": test_id})
+        return result.deleted_count > 0
 
     def list_mock_tests(self, published_only=True):
         return [MockTest.from_dict(data) for data in self.mock_tests.find({"is_published": True} if published_only else {}).sort("created_at", -1)]

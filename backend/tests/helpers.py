@@ -14,6 +14,7 @@ class TestConfig(Config):
     HUGGINGFACE_API_KEY = ""
     SECRET_KEY = "test-secret"
     ADMIN_BOOTSTRAP_TOKEN = "bootstrap-secret"
+    ENABLE_FILE_LOGGING = False
 
 
 def make_app():
@@ -100,6 +101,7 @@ def upload_text_document(client, admin_token):
         headers=auth_header(admin_token),
         data={
             "subject": "Engineering Mathematics",
+            "description": "Clustering notes",
             "file": (io.BytesIO(b"BIRCH is a clustering algorithm. It builds a CF tree."), "notes.txt"),
         },
         content_type="multipart/form-data",

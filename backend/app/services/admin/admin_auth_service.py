@@ -33,6 +33,9 @@ class AdminAuthService:
         if not admin or not self.password_service.verify_password(password, admin.password_hash):
             self.audit_logger.log(email, "ADMIN_LOGIN_FAILED")
             raise ValueError("Invalid email or password")
+        if admin.account_status.value != "ACTIVE":
+            self.audit_logger.log(admin.admin_id, "ADMIN_LOGIN_BLOCKED", {"status": admin.account_status.value})
+            raise ValueError("Admin account is not active")
         access = self.jwt_service.generate_access_token(admin, "admin", admin.role.value)
         refresh = self.jwt_service.generate_refresh_token(admin, "admin", admin.role.value)
         admin.sessions.append(Session(str(uuid4()), access, refresh, datetime.now(timezone.utc), datetime.now(timezone.utc) + timedelta(days=7)))
