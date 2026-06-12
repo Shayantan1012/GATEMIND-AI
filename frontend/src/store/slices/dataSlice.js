@@ -24,6 +24,10 @@ export const loadRagHistory = createAsyncThunk("data/loadRagHistory", async (tok
   return api.ragHistory(token);
 });
 
+export const loadUserRagDocuments = createAsyncThunk("data/loadUserRagDocuments", async (token) => {
+  return api.listRagDocuments(token);
+});
+
 const dataSlice = createSlice({
   name: "data",
   initialState: {
@@ -35,6 +39,7 @@ const dataSlice = createSlice({
     mockTests: [],
     mockHistory: [],
     ragHistory: [],
+    userRagDocuments: [],
     status: "idle",
     error: null,
   },
@@ -72,6 +77,10 @@ const dataSlice = createSlice({
       })
       .addCase(loadRagHistory.fulfilled, (state, action) => {
         state.ragHistory = action.payload.reverse();
+        state.error = null;
+      })
+      .addCase(loadUserRagDocuments.fulfilled, (state, action) => {
+        state.userRagDocuments = action.payload;
         state.error = null;
       });
   },

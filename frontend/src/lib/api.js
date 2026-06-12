@@ -64,4 +64,10 @@ export const api = {
 
   askRag: (token, query, filters) => request("/api/rag/chat", { method: "POST", headers: authHeaders(token), body: { query, filters } }),
   ragHistory: (token) => request("/api/rag/history", { headers: authHeaders(token) }),
+  listRagDocuments: (token) => request("/api/rag/documents", { headers: authHeaders(token) }),
+  uploadRagFiles: (token, files) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    return request("/api/rag/documents", { method: "POST", headers: authHeaders(token), body: formData });
+  },
 };

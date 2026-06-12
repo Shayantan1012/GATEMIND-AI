@@ -19,6 +19,12 @@ class MongoRAGRepository:
     def list_documents(self, limit=100):
         return list(self.documents.find().sort("uploaded_at", -1).limit(limit))
 
+    def list_documents_by_uploader(self, uploaded_by, limit=100):
+        return list(self.documents.find({"uploaded_by": uploaded_by}).sort("uploaded_at", -1).limit(limit))
+
+    def find_documents_by_ids(self, document_ids):
+        return list(self.documents.find({"_id": {"$in": list(document_ids)}}))
+
     def save_chat(self, chat):
         self.chats.insert_one(chat)
         return chat

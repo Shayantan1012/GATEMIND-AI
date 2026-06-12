@@ -11,9 +11,11 @@ class TestConfig(Config):
     TESTING = True
     MONGO_USE_MOCK = True
     OPENAI_API_KEY = ""
+    GROQ_API_KEY = ""
+    HUGGINGFACE_API_KEY = ""
     SECRET_KEY = "test-secret"
 
-
+    
 class BackendFlowTest(unittest.TestCase):
     def setUp(self):
         database = mongomock.MongoClient()["gatemind_test"]

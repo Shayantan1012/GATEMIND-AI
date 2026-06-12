@@ -22,6 +22,12 @@ class RAGChatService:
     def ask(self, user_id: str, query: str, filters: dict | None = None) -> RAGResponse:
         if not query.strip():
             raise ValueError("query is required")
+        document_ids = (filters or {}).get("document_ids", [])
+        if document_ids:
+            documents = self.repository.find_documents_by_ids(document_ids)
+            owned_ids = {item["_id"] for item in documents if item.get("uploaded_by") == user_id}
+            if owned_ids != set(document_ids):
+                raise ValueError("One or more attached documents are unavailable")
         retrieved = self.reranker.rerank(self.retriever.retrieve(query, filters))[: self.top_k]
         user = self.users.find_by_id(user_id)
         profile = None
@@ -50,6 +56,7 @@ class RAGChatService:
                 "query": query,
                 "answer": answer,
                 "citations": [item.to_dict() for item in citations],
+                "filters": filters or {},
                 "created_at": datetime.now(timezone.utc),
             }
         )

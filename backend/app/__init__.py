@@ -29,7 +29,7 @@ from app.services.rag.chunking.recursive_chunking_strategy import RecursiveChunk
 from app.services.rag.context_builder import ContextBuilder
 from app.services.rag.embeddings.embedding_factory import EmbeddingFactory
 from app.services.rag.indexing.langchain_indexing_pipeline import LangChainIndexingPipeline
-from app.services.rag.llm_service import LLMService
+from app.services.rag.llm_service_factory import LLMServiceFactory
 from app.services.rag.parsers.document_parser_factory import DocumentParserFactory
 from app.services.rag.rag_chat_service import RAGChatService
 from app.services.rag.retrievers.hybrid_reranker import HybridReranker
@@ -44,7 +44,10 @@ def create_app(config_class=Config, database=None):
     app.config.from_object(config_class)
 
     if database is None:
+
         if app.config["MONGO_USE_MOCK"]:
+
+
             import mongomock
 
             mongo_client = mongomock.MongoClient()
@@ -104,7 +107,7 @@ def create_app(config_class=Config, database=None):
         HybridRetriever(vector_store, embeddings, app.config["RAG_TOP_K"]),
         HybridReranker(),
         ContextBuilder(),
-        LLMService(app.config),
+        LLMServiceFactory.create(app.config),
         user_repository,
         app.config["RAG_TOP_K"],
     )

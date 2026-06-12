@@ -12,3 +12,4 @@ frontend/dist/
 frontend/frontend-dev.log
 frontend/frontend-dev.err
 node_modules/
+.venv/

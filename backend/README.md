@@ -98,9 +98,12 @@ The first admin can register directly. Later registrations require `X-Admin-Boot
 
 ### RAG
 
+- `POST /api/rag/documents`
+- `GET /api/rag/documents`
 - `POST /api/rag/chat`
 - `GET /api/rag/history`
 
+Students can upload up to five files directly from the chat composer and scope questions to selected attachments.
 Supported uploads: PDF, TXT, Markdown, CSV, JSON, PNG, JPG, JPEG, and WebP. Image OCR is enabled when Pillow and Tesseract are installed.
 
 ## Tests
