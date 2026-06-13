@@ -120,6 +120,6 @@ The integration test covers admin creation, question bank, mock-test publishing,
 
 ## AWS Backend Deployment
 
-The backend includes a production Gunicorn container, backend-only GitHub Actions CI/CD, and Terraform for ECS Fargate.
+The backend includes a production Gunicorn container, backend-only GitHub Actions CI/CD, and a lower-cost Terraform deployment using EC2 and Docker.
 
 See [`../infrastructure/backend/README.md`](../infrastructure/backend/README.md) for the complete deployment procedure.

@@ -2,22 +2,29 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023.*-x86_64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+data "aws_caller_identity" "current" {}
+
 locals {
   name = var.project_name
   common_tags = {
     Project   = var.project_name
     ManagedBy = "Terraform"
   }
-  base_secrets = {
-    SECRET_KEY = aws_secretsmanager_secret.secret_key.arn
-    MONGO_URI  = aws_secretsmanager_secret.mongo_uri.arn
-  }
-  container_secrets = [
-    for name, arn in merge(local.base_secrets, var.additional_secret_arns) : {
-      name      = name
-      valueFrom = arn
-    }
-  ]
 }
 
 resource "aws_vpc" "main" {
@@ -33,89 +40,59 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public" {
-  count                   = 2
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
+  cidr_block              = "10.40.1.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[0]
   map_public_ip_on_launch = true
-  tags                    = merge(local.common_tags, { Name = "${local.name}-public-${count.index + 1}" })
+  tags                    = merge(local.common_tags, { Name = "${local.name}-public" })
 }
 
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
+
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.main.id
   }
+
   tags = merge(local.common_tags, { Name = "${local.name}-public" })
 }
 
 resource "aws_route_table_association" "public" {
-  count          = 2
-  subnet_id      = aws_subnet.public[count.index].id
+  subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
 
-resource "aws_security_group" "alb" {
-  name        = "${local.name}-alb"
-  description = "Public HTTP access to backend load balancer"
+resource "aws_security_group" "backend" {
+  name        = "${local.name}-ec2"
+  description = "Public backend HTTP access"
   vpc_id      = aws_vpc.main.id
 
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_http_cidrs
   }
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  tags = local.common_tags
-}
 
-resource "aws_security_group" "ecs" {
-  name        = "${local.name}-ecs"
-  description = "Backend containers"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port       = 5000
-    to_port         = 5000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  tags = local.common_tags
-}
-
-resource "aws_security_group" "efs" {
-  name        = "${local.name}-efs"
-  description = "Persistent upload volume"
-  vpc_id      = aws_vpc.main.id
-
-  ingress {
-    from_port       = 2049
-    to_port         = 2049
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ecs.id]
-  }
   tags = local.common_tags
 }
 
 resource "aws_ecr_repository" "backend" {
   name                 = local.name
   image_tag_mutability = "MUTABLE"
+
   image_scanning_configuration {
     scan_on_push = true
   }
+
   tags = local.common_tags
 }
 
@@ -124,50 +101,15 @@ resource "aws_ecr_lifecycle_policy" "backend" {
   policy = jsonencode({
     rules = [{
       rulePriority = 1
-      description  = "Keep the most recent 20 images"
+      description  = "Keep the most recent 10 images"
       selection = {
         tagStatus   = "any"
         countType   = "imageCountMoreThan"
-        countNumber = 20
+        countNumber = 10
       }
       action = { type = "expire" }
     }]
   })
-}
-
-resource "aws_cloudwatch_log_group" "backend" {
-  name              = "/ecs/${local.name}"
-  retention_in_days = 30
-  tags              = local.common_tags
-}
-
-resource "aws_efs_file_system" "uploads" {
-  encrypted = true
-  tags      = merge(local.common_tags, { Name = "${local.name}-uploads" })
-}
-
-resource "aws_efs_mount_target" "uploads" {
-  count           = 2
-  file_system_id  = aws_efs_file_system.uploads.id
-  subnet_id       = aws_subnet.public[count.index].id
-  security_groups = [aws_security_group.efs.id]
-}
-
-resource "aws_efs_access_point" "uploads" {
-  file_system_id = aws_efs_file_system.uploads.id
-  posix_user {
-    gid = 1000
-    uid = 1000
-  }
-  root_directory {
-    path = "/uploads"
-    creation_info {
-      owner_gid   = 1000
-      owner_uid   = 1000
-      permissions = "0755"
-    }
-  }
-  tags = local.common_tags
 }
 
 resource "aws_secretsmanager_secret" "secret_key" {
@@ -180,179 +122,94 @@ resource "aws_secretsmanager_secret" "mongo_uri" {
   tags = local.common_tags
 }
 
-resource "aws_iam_role" "execution" {
-  name = "${local.name}-execution"
+resource "aws_iam_role" "instance" {
+  name = "${local.name}-instance"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Action = "sts:AssumeRole"
       Effect = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
+      Action = "sts:AssumeRole"
+      Principal = { Service = "ec2.amazonaws.com" }
     }]
   })
   tags = local.common_tags
 }
 
-resource "aws_iam_role_policy_attachment" "execution" {
-  role       = aws_iam_role.execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+resource "aws_iam_role_policy_attachment" "ssm" {
+  role       = aws_iam_role.instance.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-resource "aws_iam_role_policy" "execution_secrets" {
-  name = "read-backend-secrets"
-  role = aws_iam_role.execution.id
+resource "aws_iam_role_policy" "instance" {
+  name = "pull-image-and-read-secrets"
+  role = aws_iam_role.instance.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = concat(values(local.base_secrets), values(var.additional_secret_arns))
-    }]
-  })
-}
-
-resource "aws_iam_role" "task" {
-  name = "${local.name}-task"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = { Service = "ecs-tasks.amazonaws.com" }
-    }]
-  })
-  tags = local.common_tags
-}
-
-resource "aws_lb" "backend" {
-  name               = substr(local.name, 0, 32)
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.alb.id]
-  subnets            = aws_subnet.public[*].id
-  tags               = local.common_tags
-}
-
-resource "aws_lb_target_group" "backend" {
-  name        = substr("${local.name}-tg", 0, 32)
-  port        = 5000
-  protocol    = "HTTP"
-  target_type = "ip"
-  vpc_id      = aws_vpc.main.id
-  health_check {
-    path                = "/api/health"
-    healthy_threshold   = 2
-    unhealthy_threshold = 3
-    timeout             = 5
-    interval            = 30
-    matcher             = "200"
-  }
-  tags = local.common_tags
-}
-
-resource "aws_lb_listener" "http" {
-  load_balancer_arn = aws_lb.backend.arn
-  port              = 80
-  protocol          = "HTTP"
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend.arn
-  }
-}
-
-resource "aws_ecs_cluster" "backend" {
-  name = local.name
-  setting {
-    name  = "containerInsights"
-    value = "enabled"
-  }
-  tags = local.common_tags
-}
-
-resource "aws_ecs_task_definition" "backend" {
-  family                   = local.name
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = var.cpu
-  memory                   = var.memory
-  execution_role_arn       = aws_iam_role.execution.arn
-  task_role_arn            = aws_iam_role.task.arn
-
-  volume {
-    name = "uploads"
-    efs_volume_configuration {
-      file_system_id     = aws_efs_file_system.uploads.id
-      transit_encryption = "ENABLED"
-      authorization_config {
-        access_point_id = aws_efs_access_point.uploads.id
-        iam             = "DISABLED"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer"
+        ]
+        Resource = aws_ecr_repository.backend.arn
+      },
+      {
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = concat(
+          [aws_secretsmanager_secret.secret_key.arn, aws_secretsmanager_secret.mongo_uri.arn],
+          values(var.additional_secret_arns)
+        )
       }
-    }
-  }
-
-  container_definitions = jsonencode([{
-    name      = local.name
-    image     = "${aws_ecr_repository.backend.repository_url}:latest"
-    essential = true
-    portMappings = [{
-      containerPort = 5000
-      hostPort      = 5000
-      protocol      = "tcp"
-    }]
-    environment = [
-      { name = "APP_ENV", value = "production" },
-      { name = "PORT", value = "5000" },
-      { name = "MONGO_DB_NAME", value = var.mongo_db_name },
-      { name = "MONGO_USE_MOCK", value = "false" },
-      { name = "UPLOAD_FOLDER", value = "/app/uploads" },
-      { name = "ENABLE_FILE_LOGGING", value = "false" },
-      { name = "ALLOWED_ORIGINS", value = var.allowed_origins }
     ]
-    secrets = local.container_secrets
-    mountPoints = [{
-      sourceVolume  = "uploads"
-      containerPath = "/app/uploads"
-      readOnly      = false
-    }]
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = aws_cloudwatch_log_group.backend.name
-        awslogs-region        = var.aws_region
-        awslogs-stream-prefix = "backend"
-      }
-    }
-  }])
-
-  depends_on = [aws_efs_mount_target.uploads]
-  tags       = local.common_tags
+  })
 }
 
-resource "aws_ecs_service" "backend" {
-  name            = local.name
-  cluster         = aws_ecs_cluster.backend.id
-  task_definition = aws_ecs_task_definition.backend.arn
-  desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+resource "aws_iam_instance_profile" "backend" {
+  name = "${local.name}-instance"
+  role = aws_iam_role.instance.name
+}
 
-  network_configuration {
-    subnets          = aws_subnet.public[*].id
-    security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = true
+resource "aws_instance" "backend" {
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = var.instance_type
+  subnet_id                   = aws_subnet.public.id
+  vpc_security_group_ids      = [aws_security_group.backend.id]
+  iam_instance_profile        = aws_iam_instance_profile.backend.name
+  associate_public_ip_address = true
+  user_data_replace_on_change = true
+
+  root_block_device {
+    volume_type           = "gp3"
+    volume_size           = var.root_volume_size
+    encrypted             = true
+    delete_on_termination = true
   }
 
-  load_balancer {
-    target_group_arn = aws_lb_target_group.backend.arn
-    container_name   = local.name
-    container_port   = 5000
-  }
+  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+    aws_region             = var.aws_region
+    ecr_repository_url     = aws_ecr_repository.backend.repository_url
+    secret_key_secret_arn  = aws_secretsmanager_secret.secret_key.arn
+    mongo_uri_secret_arn   = aws_secretsmanager_secret.mongo_uri.arn
+    mongo_db_name          = var.mongo_db_name
+    allowed_origins        = var.allowed_origins
+    additional_secret_arns = jsonencode(var.additional_secret_arns)
+  })
 
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
+  tags = merge(local.common_tags, { Name = local.name })
+}
 
-  depends_on = [aws_lb_listener.http, aws_efs_mount_target.uploads]
-  tags       = local.common_tags
+resource "aws_eip" "backend" {
+  domain   = "vpc"
+  instance = aws_instance.backend.id
+  tags     = merge(local.common_tags, { Name = "${local.name}-ip" })
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
@@ -390,10 +247,8 @@ resource "aws_iam_role_policy" "github_deploy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = [
-          "ecr:GetAuthorizationToken"
-        ]
+        Effect   = "Allow"
+        Action   = ["ecr:GetAuthorizationToken"]
         Resource = "*"
       },
       {
@@ -409,11 +264,16 @@ resource "aws_iam_role_policy" "github_deploy" {
       },
       {
         Effect = "Allow"
-        Action = [
-          "ecs:DescribeServices",
-          "ecs:UpdateService"
+        Action = ["ssm:SendCommand"]
+        Resource = [
+          aws_instance.backend.arn,
+          "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript"
         ]
-        Resource = aws_ecs_service.backend.id
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:GetCommandInvocation"]
+        Resource = "*"
       }
     ]
   })

@@ -19,28 +19,30 @@ variable "allowed_origins" {
   default     = "http://localhost:5173"
 }
 
+variable "allowed_http_cidrs" {
+  description = "Networks allowed to access backend HTTP."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
 variable "mongo_db_name" {
   type    = string
   default = "gatemind"
 }
 
-variable "desired_count" {
-  type    = number
-  default = 0
+variable "instance_type" {
+  type    = string
+  default = "t3.small"
 }
 
-variable "cpu" {
-  type    = number
-  default = 1024
-}
-
-variable "memory" {
-  type    = number
-  default = 4096
+variable "root_volume_size" {
+  description = "Encrypted EBS root volume size in GiB. Uploaded files persist here."
+  type        = number
+  default     = 30
 }
 
 variable "additional_secret_arns" {
-  description = "Optional ECS environment secret names mapped to existing Secrets Manager ARNs."
+  description = "Optional environment variable names mapped to existing Secrets Manager ARNs."
   type        = map(string)
   default     = {}
 }

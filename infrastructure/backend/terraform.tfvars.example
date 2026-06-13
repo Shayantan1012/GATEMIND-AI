@@ -3,6 +3,8 @@ project_name      = "gatemind-backend"
 github_repository = "Shayantan1012/GATEMIND-AI"
 allowed_origins   = "https://your-frontend-domain.example"
 mongo_db_name     = "gatemind"
+instance_type     = "t3.small"
+root_volume_size  = 30
 
 # Add existing Secrets Manager ARNs when needed:
 # additional_secret_arns = {

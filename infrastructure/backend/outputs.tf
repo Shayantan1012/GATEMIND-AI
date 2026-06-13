@@ -1,5 +1,13 @@
 output "backend_url" {
-  value = "http://${aws_lb.backend.dns_name}"
+  value = "http://${aws_eip.backend.public_ip}"
+}
+
+output "backend_instance_id" {
+  value = aws_instance.backend.id
+}
+
+output "backend_public_ip" {
+  value = aws_eip.backend.public_ip
 }
 
 output "aws_region" {
@@ -8,14 +16,6 @@ output "aws_region" {
 
 output "ecr_repository" {
   value = aws_ecr_repository.backend.name
-}
-
-output "ecs_cluster" {
-  value = aws_ecs_cluster.backend.name
-}
-
-output "ecs_service" {
-  value = aws_ecs_service.backend.name
 }
 
 output "github_deploy_role_arn" {
