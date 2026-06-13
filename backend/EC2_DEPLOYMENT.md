@@ -76,7 +76,6 @@ Add:
 
 ```env
 APP_ENV=production
-PORT=5000
 SECRET_KEY=replace-with-a-long-random-secret
 MONGO_URI=your-mongodb-atlas-connection-string
 MONGO_DB_NAME=gatemind
@@ -86,6 +85,9 @@ ENABLE_FILE_LOGGING=false
 ALLOWED_ORIGINS=https://your-frontend-domain.example
 GROQ_API_KEY=your-groq-key-if-used
 ```
+
+The container port is fixed to `5000` by `docker-compose.prod.yml`; do not add
+`PORT` to this environment file.
 
 Protect it:
 

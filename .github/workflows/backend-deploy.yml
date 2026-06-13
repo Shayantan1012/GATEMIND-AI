@@ -91,11 +91,11 @@ jobs:
         run: |
           echo "Checking backend from inside EC2..."
           ssh -o BatchMode=yes -i ~/.ssh/gatemind "$EC2_USER@$EC2_HOST" '
-            for attempt in {1..12}; do
+            for attempt in {1..36}; do
               if curl --fail --show-error --silent http://127.0.0.1/api/health; then
                 exit 0
               fi
-              echo "Internal health check attempt ${attempt}/12 failed"
+              echo "Internal health check attempt ${attempt}/36 failed"
               sleep 10
             done
             exit 1
