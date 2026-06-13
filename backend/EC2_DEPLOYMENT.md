@@ -6,7 +6,7 @@ This deployment uses one EC2 instance and Docker Compose. Terraform, ECS, ECR, a
 
 In the AWS console:
 
-1. Open **EC2 → Launch instance**.
+1. Open **EC2 -> Launch instance**.
 2. Name it `gatemind-backend`.
 3. Select **Amazon Linux 2023**.
 4. Select `t3.small`. Use `t3.micro` only for light testing.
@@ -15,6 +15,7 @@ In the AWS console:
 7. Allow inbound:
    - SSH `22` from **My IP**
    - HTTP `80` from `0.0.0.0/0`
+   - HTTPS `443` from `0.0.0.0/0` when HTTPS is configured
 8. Launch the instance.
 9. Allocate and associate an Elastic IP so the backend address does not change.
 
@@ -49,8 +50,18 @@ AWS charges for public IPv4 addresses, including Elastic IPs. Release an Elastic
 From PowerShell:
 
 ```powershell
-ssh -i "C:\path\to\gatemind.pem" ec2-user@YOUR_EC2_PUBLIC_IP
+ssh -i "C:\path\to\gatemind.pem" ec2-user@YOUR_EC2_ELASTIC_IP
 ```
+
+If Windows reports that the private key permissions are too open:
+
+```powershell
+$key = "C:\path\to\gatemind.pem"
+icacls $key /inheritance:r
+icacls $key /grant:r "$($env:USERNAME):(R)"
+```
+
+Never commit or share the private key. If it is exposed, create a replacement key, add its public key to `~/.ssh/authorized_keys`, update the GitHub secret, verify the new key, and remove the old key.
 
 ## 3. Install Docker on EC2
 
@@ -110,15 +121,18 @@ UPLOAD_FOLDER=/app/uploads
 ENABLE_FILE_LOGGING=false
 ALLOWED_ORIGINS=https://your-frontend-domain.example
 GROQ_API_KEY=your-groq-key-if-used
+HUGGINGFACE_API_KEY=your-huggingface-key-if-used
+HF_TOKEN=your-huggingface-key-if-used
 OTP_PREVIEW_ENABLED=false
 ```
 
 Set `OTP_PREVIEW_ENABLED=true` only while SMS delivery is unavailable. It returns OTPs to the requesting frontend and must be disabled after Twilio is configured.
 
-The container port is fixed to `5000` by `docker-compose.prod.yml`; do not add
-`PORT` to this environment file.
+Pending OTPs are stored in the running backend process for ten minutes. A container restart or deployment invalidates pending OTPs.
 
-Protect it:
+The container port is fixed to `5000` by `docker-compose.prod.yml`; do not add `PORT` to this environment file.
+
+Protect the environment file:
 
 ```bash
 sudo chmod 600 /opt/gatemind/backend.env
@@ -129,7 +143,7 @@ sudo chmod 600 /opt/gatemind/backend.env
 Add the EC2 Elastic IP followed by `/32` under:
 
 ```text
-MongoDB Atlas → Security → Network Access
+MongoDB Atlas -> Security -> Network Access
 ```
 
 ## 6. Configure GitHub Actions
@@ -137,17 +151,19 @@ MongoDB Atlas → Security → Network Access
 Open:
 
 ```text
-GitHub repository → Settings → Secrets and variables → Actions
+GitHub repository -> Settings -> Secrets and variables -> Actions
 ```
 
 Add repository secrets:
 
 - `EC2_HOST`: EC2 Elastic IP
-- `EC2_SSH_PRIVATE_KEY`: complete contents of the downloaded `.pem` file
+- `EC2_SSH_PRIVATE_KEY`: complete contents of the private SSH key
 
 Add repository variable:
 
 - `EC2_USER`: `ec2-user`
+
+Secret names contain only letters, numbers, and underscores. Do not include `=`, spaces, or quotes in their names.
 
 ## 7. Deploy
 
@@ -156,7 +172,7 @@ Commit and push to `main`. Backend CI runs first. After it passes, GitHub Action
 You can also manually run:
 
 ```text
-GitHub repository → Actions → Deploy Backend to EC2 → Run workflow
+GitHub repository -> Actions -> Deploy Backend to EC2 -> Run workflow
 ```
 
 ## 8. Verify
@@ -176,16 +192,62 @@ Expected response:
 }
 ```
 
+## Connect the Vercel Frontend
+
+The frontend uses relative `/api` requests. `frontend/vercel.json` proxies those requests from Vercel to EC2, avoiding browser mixed-content errors while the backend uses HTTP.
+
+Update the proxy destination whenever the Elastic IP changes:
+
+```json
+{
+  "source": "/api/:path*",
+  "destination": "http://YOUR_EC2_ELASTIC_IP/api/:path*"
+}
+```
+
+Do not set `VITE_API_BASE_URL` in Vercel while using this proxy. After changing `frontend/vercel.json`, push the change and let Vercel redeploy.
+
+When a backend HTTPS domain is available, set:
+
+```text
+VITE_API_BASE_URL=https://api.your-domain.example
+```
+
+Then the frontend can call the backend domain directly.
+
+## HTTPS
+
+This basic setup uses HTTP. Before handling production users:
+
+1. Point a backend domain such as `api.your-domain.example` to the Elastic IP.
+2. Bind the Docker port to localhost instead of exposing it publicly.
+3. Install Nginx and configure it as a reverse proxy to `127.0.0.1:5000`.
+4. Install a Let's Encrypt certificate with Certbot.
+5. Change the Vercel API URL to the HTTPS backend domain.
+6. Set `ALLOWED_ORIGINS` to the exact Vercel production URL.
+
 ## Useful EC2 Commands
 
 ```bash
-sudo docker ps
-sudo docker logs --tail 100 gatemind-backend
+sudo systemctl status docker --no-pager
+sudo docker ps -a
+sudo docker logs --tail 300 gatemind-backend
 sudo docker compose -f /opt/gatemind/source/backend/docker-compose.prod.yml restart
+curl http://127.0.0.1/api/health
 ```
 
 Uploaded documents remain under `/opt/gatemind/uploads` across container deployments.
 
-## HTTPS
+Confirm an environment variable exists without displaying its value:
 
-This basic setup uses HTTP. Before handling production users, configure a domain with Nginx and Let’s Encrypt or add an AWS load balancer later.
+```bash
+sudo docker exec gatemind-backend sh -c 'test -n "$MONGO_URI" && echo MONGO_URI=SET || echo MONGO_URI=MISSING'
+```
+
+Check whether OTP preview mode reached the container:
+
+```bash
+sudo docker exec gatemind-backend printenv OTP_PREVIEW_ENABLED
+```
+
+If GitHub Actions deployment fails, open the **Show backend diagnostics** step. It prints Docker status, health information, and recent application logs.
