@@ -1,6 +1,6 @@
 aws_region        = "ap-south-1"
 project_name      = "gatemind-backend"
-github_repository = "YOUR_GITHUB_USERNAME/YOUR_REPOSITORY"
+github_repository = "Shayantan1012/GATEMIND-AI"
 allowed_origins   = "https://your-frontend-domain.example"
 mongo_db_name     = "gatemind"
 

@@ -81,6 +81,8 @@ Create these GitHub Actions variables:
 
 Push to `main` or manually run **Deploy Backend to AWS**. The workflow builds the backend image, pushes it to ECR, and starts the ECS service.
 
+Docker Desktop does not need to be running on your computer for GitHub Actions deployment.
+
 ## 5. Verify
 
 ```powershell

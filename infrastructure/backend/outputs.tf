@@ -2,6 +2,10 @@ output "backend_url" {
   value = "http://${aws_lb.backend.dns_name}"
 }
 
+output "aws_region" {
+  value = var.aws_region
+}
+
 output "ecr_repository" {
   value = aws_ecr_repository.backend.name
 }

@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from pymongo import MongoClient
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.config import Config
 from app.controllers.admin_controller import admin_bp
@@ -44,6 +45,8 @@ from app.utils.logging_config import configure_file_logging
 def create_app(config_class=Config, database=None):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    _validate_production_config(app)
     configure_file_logging(app)
 
     @app.after_request
@@ -161,3 +164,14 @@ def create_app(config_class=Config, database=None):
         )
 
     return app
+
+
+def _validate_production_config(app):
+    if app.config["APP_ENV"] != "production":
+        return
+    if app.config["SECRET_KEY"] == "change-this-secret-in-production":
+        raise RuntimeError("SECRET_KEY must be configured in production")
+    if app.config["MONGO_USE_MOCK"]:
+        raise RuntimeError("MONGO_USE_MOCK must be false in production")
+    if app.config["MONGO_URI"] == "mongodb://localhost:27017":
+        raise RuntimeError("MONGO_URI must be configured in production")
