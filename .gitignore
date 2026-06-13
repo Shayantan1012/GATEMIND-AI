@@ -13,3 +13,8 @@ frontend/frontend-dev.log
 frontend/frontend-dev.err
 node_modules/
 .venv/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log

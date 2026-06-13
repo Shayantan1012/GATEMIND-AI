@@ -117,3 +117,9 @@ Test output from `run_tests.py` is stored in `uploads/test-output/latest-tests.l
 These files remain until a super admin uses the storage cleanup action.
 
 The integration test covers admin creation, question bank, mock-test publishing, user OTP verification, submission/evaluation, performance personalization, document indexing, RAG retrieval, citations, and dashboard analytics.
+
+## AWS Backend Deployment
+
+The backend includes a production Gunicorn container, backend-only GitHub Actions CI/CD, and Terraform for ECS Fargate.
+
+See [`../infrastructure/backend/README.md`](../infrastructure/backend/README.md) for the complete deployment procedure.

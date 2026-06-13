@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from pymongo import MongoClient
 
 from app.config import Config
@@ -45,6 +45,16 @@ def create_app(config_class=Config, database=None):
     app = Flask(__name__)
     app.config.from_object(config_class)
     configure_file_logging(app)
+
+    @app.after_request
+    def add_cors_headers(response):
+        origin = request.headers.get("Origin")
+        if origin and origin in app.config["ALLOWED_ORIGINS"]:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, X-Admin-Bootstrap-Token"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            response.headers["Vary"] = "Origin"
+        return response
 
     if database is None:
 

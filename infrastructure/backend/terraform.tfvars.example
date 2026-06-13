@@ -1,0 +1,12 @@
+aws_region        = "ap-south-1"
+project_name      = "gatemind-backend"
+github_repository = "YOUR_GITHUB_USERNAME/YOUR_REPOSITORY"
+allowed_origins   = "https://your-frontend-domain.example"
+mongo_db_name     = "gatemind"
+
+# Add existing Secrets Manager ARNs when needed:
+# additional_secret_arns = {
+#   GROQ_API_KEY         = "arn:aws:secretsmanager:..."
+#   OPENAI_API_KEY       = "arn:aws:secretsmanager:..."
+#   ADMIN_BOOTSTRAP_TOKEN = "arn:aws:secretsmanager:..."
+# }

@@ -9,7 +9,6 @@ if __name__ == "__main__":
     app.run(
         host=os.getenv("HOST", "0.0.0.0"),
         port=int(os.getenv("PORT", "5000")),
-        debug = True,
-        # debug=os.getenv("FLASK_DEBUG", "true").lower() == "true",
+        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
         use_reloader=False,
     )

@@ -9,6 +9,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 class Config:
+    APP_ENV = os.getenv("APP_ENV", "development")
     SECRET_KEY = os.getenv("SECRET_KEY", "change-this-secret-in-production")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=30)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
@@ -28,6 +29,11 @@ class Config:
         str(Path(UPLOAD_FOLDER) / "test-output"),
     )
     ENABLE_FILE_LOGGING = os.getenv("ENABLE_FILE_LOGGING", "true").lower() == "true"
+    ALLOWED_ORIGINS = [
+        origin.strip()
+        for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+        if origin.strip()
+    ]
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(25 * 1024 * 1024)))
 
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
