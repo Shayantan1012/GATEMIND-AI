@@ -7,6 +7,14 @@ from app.services.security.check_email import CheckEmail
 
 
 class AdminAuthService:
+    EMPLOYEE_ID_PREFIXES = {
+        "SUPER_ADMIN": "SA",
+        "CONTENT_ADMIN": "CA",
+        "MOCKTEST_ADMIN": "MA",
+        "ANALYTICS_ADMIN": "AA",
+        "SUPPORT_ADMIN": "SP",
+    }
+
     def __init__(self, repository, password_service, jwt_service, audit_logger):
         self.repository = repository
         self.password_service = password_service
@@ -14,19 +22,32 @@ class AdminAuthService:
         self.audit_logger = audit_logger
 
     def register(self, data):
-        missing = [key for key in ["full_name", "email", "password", "role"] if not data.get(key)]
+        required_fields = ["full_name", "email", "password", "phone_number", "role", "department"]
+        missing = [key for key in required_fields if not data.get(key)]
         if missing:
             raise ValueError(f"Missing required fields: {', '.join(missing)}")
         if not CheckEmail.contains_necessary_character(data["email"]):
             raise ValueError("Invalid email address")
         if self.repository.exists_by_email(data["email"]):
             raise ValueError("Admin email already registered")
+        phone = "".join(character for character in data["phone_number"] if character.isdigit())
+        if len(phone) < 10 or len(phone) > 15:
+            raise ValueError("Phone number must contain between 10 and 15 digits")
         if not self.password_service.validate_password_strength(data["password"]):
             raise ValueError("Password must be at least 8 characters and include letters and numbers")
-        admin = Admin.create(data, self.password_service.hash_password(data["password"]))
+        registration = dict(data)
+        registration["employee_id"] = self._generate_employee_id(data["role"])
+        admin = Admin.create(registration, self.password_service.hash_password(data["password"]))
         self.repository.save(admin)
         self.audit_logger.log(admin.admin_id, "ADMIN_REGISTERED", {"role": admin.role.value})
         return admin
+
+    def _generate_employee_id(self, role):
+        prefix = self.EMPLOYEE_ID_PREFIXES.get(role, "AD")
+        while True:
+            employee_id = f"GM-{prefix}-{uuid4().hex[:8].upper()}"
+            if not self.repository.exists_by_employee_id(employee_id):
+                return employee_id
 
     def login(self, email, password):
         admin = self.repository.find_by_email(email)

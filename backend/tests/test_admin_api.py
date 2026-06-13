@@ -15,30 +15,67 @@ class AdminApiTest(unittest.TestCase):
         self.assertEqual(dashboard.status_code, 200)
         self.assertEqual(dashboard.json["data"]["admins"], 1)
 
-    def test_second_admin_requires_bootstrap_token(self):
-        register_and_login_admin(self.client)
+    def test_only_super_admin_can_create_additional_admins(self):
+        super_admin = register_and_login_admin(self.client)
         blocked = self.client.post(
             "/api/admin/auth/register",
             json={
                 "full_name": "Second Admin",
                 "email": "second@gatemind.ai",
                 "password": "AdminPass123",
+                "phone_number": "+919876543211",
+                "department": "Academic Operations",
                 "role": "CONTENT_ADMIN",
             },
         )
         self.assertEqual(blocked.status_code, 403)
 
         allowed = self.client.post(
-            "/api/admin/auth/register",
-            headers={"X-Admin-Bootstrap-Token": "bootstrap-secret"},
+            "/api/admin/staff",
+            headers=auth_header(super_admin["access_token"]),
             json={
                 "full_name": "Second Admin",
                 "email": "second@gatemind.ai",
                 "password": "AdminPass123",
+                "phone_number": "+919876543211",
+                "department": "Academic Operations",
+                "job_title": "Content Administrator",
                 "role": "CONTENT_ADMIN",
             },
         )
         self.assertEqual(allowed.status_code, 201)
+        self.assertRegex(allowed.json["data"]["employee_id"], r"^GM-CA-[A-F0-9]{8}$")
+        self.assertEqual(allowed.json["data"]["department"], "Academic Operations")
+
+    def test_non_super_admin_cannot_create_admin_staff(self):
+        content_admin = register_and_login_admin(self.client, email="content@gatemind.ai", role="CONTENT_ADMIN")
+        response = self.client.post(
+            "/api/admin/staff",
+            headers=auth_header(content_admin["access_token"]),
+            json={
+                "full_name": "Unauthorized Staff",
+                "email": "unauthorized@gatemind.ai",
+                "password": "AdminPass123",
+                "phone_number": "+919876543212",
+                "department": "Operations",
+                "role": "SUPPORT_ADMIN",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_registration_requires_staff_contact_information(self):
+        response = self.client.post(
+            "/api/admin/auth/register",
+            json={
+                "full_name": "Incomplete Admin",
+                "email": "incomplete@gatemind.ai",
+                "password": "AdminPass123",
+                "role": "CONTENT_ADMIN",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("phone_number", response.json["message"])
+        self.assertIn("department", response.json["message"])
 
     def test_admin_question_create_and_list(self):
         login = register_and_login_admin(self.client)

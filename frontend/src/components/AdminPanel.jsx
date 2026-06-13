@@ -17,6 +17,13 @@ const EMPTY_TEST = {
 };
 
 const QUESTION_TYPES = ["MCQ", "MSQ", "NAT"];
+const ADMIN_ROLES = [
+  { value: "SUPER_ADMIN", label: "Super Admin", access: "All modules, staff creation, and maintenance" },
+  { value: "CONTENT_ADMIN", label: "Content Admin", access: "RAG documents and question content" },
+  { value: "MOCKTEST_ADMIN", label: "Mock Test Admin", access: "Question content and mock-test management" },
+  { value: "ANALYTICS_ADMIN", label: "Analytics Admin", access: "Dashboard, users, mock tests, and RAG reporting" },
+  { value: "SUPPORT_ADMIN", label: "Support Admin", access: "User directory and support information" },
+];
 const SUBJECT_OPTIONS = [
   "Engineering Mathematics",
   "Digital Logic",
@@ -51,7 +58,15 @@ export default function AdminPanel() {
   const adminRole = useSelector((state) => state.auth.admin?.profile?.role);
   const { dashboard, usersOverview, documents, mockTests } = useSelector((state) => state.data);
   const [status, setStatus] = useState(null);
-  const [auth, setAuth] = useState({ full_name: "", email: "", password: "", role: "SUPER_ADMIN", bootstrap: "" });
+  const [auth, setAuth] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    phone_number: "",
+    job_title: "",
+    department: "",
+    role: "SUPER_ADMIN",
+  });
   const [test, setTest] = useState({ ...EMPTY_TEST, questions: [createEmptyDraftQuestion()] });
   const [file, setFile] = useState(null);
   const [subject, setSubject] = useState("Engineering Mathematics");
@@ -64,6 +79,7 @@ export default function AdminPanel() {
     { id: "users", label: "Users", icon: Users, visible: can("ANALYTICS_ADMIN", "SUPPORT_ADMIN") },
     { id: "mocktests", label: "Mock Tests", icon: BarChart3, visible: can("MOCKTEST_ADMIN", "ANALYTICS_ADMIN") },
     { id: "rag", label: "RAG", icon: FolderKanban, visible: can("CONTENT_ADMIN", "ANALYTICS_ADMIN") },
+    { id: "staff", label: "Admin Staff", icon: ShieldCheck, visible: adminRole === "SUPER_ADMIN" },
     { id: "maintenance", label: "Maintenance", icon: Trash2, visible: adminRole === "SUPER_ADMIN" },
   ].filter((item) => item.visible);
 
@@ -93,14 +109,76 @@ export default function AdminPanel() {
     }
   }
 
-  async function adminRegister() {
+  async function adminRegister(event) {
+    event.preventDefault();
     setStatus(null);
     try {
-      const payload = await api.registerAdmin(auth, auth.bootstrap);
-      setStatus({ type: "success", text: `Admin ${payload.email} registered.` });
+      const payload = token
+        ? await api.createAdminStaff(token, auth)
+        : await api.registerAdmin({ ...auth, role: "SUPER_ADMIN" });
+      setStatus({
+        type: "success",
+        text: `${payload.full_name} registered with employee ID ${payload.employee_id}.`,
+      });
+      setAuth((current) => ({
+        ...current,
+        full_name: "",
+        email: "",
+        password: "",
+        phone_number: "",
+        job_title: "",
+        department: "",
+        role: token ? "CONTENT_ADMIN" : "SUPER_ADMIN",
+      }));
+      if (token) await loadAdminData();
     } catch (error) {
       setStatus({ type: "error", text: error.message });
     }
+  }
+
+  function adminRegistrationForm({ initialSetup = false } = {}) {
+    const selectedRole = ADMIN_ROLES.find((role) => role.value === auth.role);
+    return (
+      <form className="panel admin-registration-form" onSubmit={adminRegister}>
+        <p className="eyebrow"><Plus size={15} /> {initialSetup ? "Initial Setup" : "Staff Access"}</p>
+        <h2>{initialSetup ? "Create First Super Admin" : "Register Admin Staff"}</h2>
+        <p className="muted">
+          {initialSetup
+            ? "Initialize the protected admin portal. The first account always receives full Super Admin access."
+            : "Only Super Admins can create staff accounts. A unique employee ID is generated automatically."}
+        </p>
+        <div className="two-col">
+          <Field label="Full name" value={auth.full_name} onChange={(value) => setAuth({ ...auth, full_name: value })} />
+          <Field label="Email" type="email" value={auth.email} onChange={(value) => setAuth({ ...auth, email: value })} />
+          <Field label="Phone number" type="tel" placeholder="+91 98765 43210" value={auth.phone_number} onChange={(value) => setAuth({ ...auth, phone_number: value })} />
+          <Field label="Job title" placeholder="Example: Content Manager" value={auth.job_title} onChange={(value) => setAuth({ ...auth, job_title: value })} />
+          <Field label="Department" placeholder="Example: Academic Operations" value={auth.department} onChange={(value) => setAuth({ ...auth, department: value })} />
+          <Field label="Temporary password" type="password" value={auth.password} onChange={(value) => setAuth({ ...auth, password: value })} />
+        </div>
+        {initialSetup ? (
+          <div className="role-access-note">
+            <strong>Super Admin</strong>
+            <span>All modules, staff creation, role assignment, and maintenance</span>
+          </div>
+        ) : (
+          <>
+            <label className="field">
+              Role
+              <select value={auth.role} onChange={(event) => setAuth({ ...auth, role: event.target.value })}>
+                {ADMIN_ROLES.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+              </select>
+            </label>
+            <div className="role-access-note">
+              <strong>{selectedRole?.label}</strong>
+              <span>{selectedRole?.access}</span>
+            </div>
+          </>
+        )}
+        <button className="secondary-button" type="submit">
+          {initialSetup ? "Initialize Super Admin" : "Create Staff Account"}
+        </button>
+      </form>
+    );
   }
 
   function resetTestForm() {
@@ -306,14 +384,7 @@ export default function AdminPanel() {
           <button className="primary-button" type="submit">Login Admin</button>
           <StatusNote status={status} />
         </form>
-        <div className="panel">
-          <p className="eyebrow"><Plus size={15} /> Bootstrap</p>
-          <h2>Register Admin</h2>
-          <Field label="Full name" value={auth.full_name} onChange={(value) => setAuth({ ...auth, full_name: value })} />
-          <Field label="Role" value={auth.role} onChange={(value) => setAuth({ ...auth, role: value })} />
-          <Field label="Bootstrap token" value={auth.bootstrap} onChange={(value) => setAuth({ ...auth, bootstrap: value })} />
-          <button className="secondary-button" type="button" onClick={adminRegister}>Register Admin</button>
-        </div>
+        {adminRegistrationForm({ initialSetup: true })}
       </section>
     );
   }
@@ -737,6 +808,8 @@ export default function AdminPanel() {
           </div>
         </form>
       ) : null}
+
+      {activeTab === "staff" ? adminRegistrationForm() : null}
 
       {activeTab === "maintenance" ? (
         <div className="panel">

@@ -1,7 +1,6 @@
 import {
   BrainCircuit,
   ClipboardCheck,
-  FileUp,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -19,27 +18,93 @@ import AdminPanel from "./components/AdminPanel";
 import MockTestPanel from "./components/MockTestPanel";
 import ProfilePanel from "./components/ProfilePanel";
 import RagPanel from "./components/RagPanel";
-import { clearAllSessions } from "./store/slices/authSlice";
+import { clearAdminSession, clearUserSession } from "./store/slices/authSlice";
 
 const NAV_ITEMS = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "mocktests", label: "Mock Tests", icon: ClipboardCheck },
   { id: "rag", label: "RAG Chat", icon: MessageSquareText },
-  { id: "admin", label: "Admin", icon: ShieldCheck },
 ];
 
 export default function App() {
-  const dispatch = useDispatch();
-  const { user, admin } = useSelector((state) => state.auth);
-  const [activeView, setActiveView] = useState("profile");
+  const isAdminRoute = window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
+  return isAdminRoute ? <AdminPortal /> : <StudentPortal />;
+}
+
+function useBackendHealth() {
   const [health, setHealth] = useState("checking");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     api
       .health()
       .then(() => setHealth("online"))
       .catch(() => setHealth("offline"));
+  }, []);
+
+  return health;
+}
+
+function AdminPortal() {
+  const dispatch = useDispatch();
+  const admin = useSelector((state) => state.auth.admin);
+  const health = useBackendHealth();
+
+  useEffect(() => {
+    document.title = "GATEMIND Admin";
+  }, []);
+
+  return (
+    <div className="admin-portal">
+      <header className="admin-portal-header">
+        <div className="admin-brand">
+          <div className="brand-mark">
+            <BrainCircuit size={26} />
+          </div>
+          <div>
+            <p>GATEMIND ADMIN</p>
+            <span>Operations Console</span>
+          </div>
+        </div>
+
+        <div className="session-strip">
+          <div className={`health ${health}`}>
+            <span />
+            Backend {health}
+          </div>
+          <span>{admin ? admin.profile.full_name : "Admin access required"}</span>
+          {admin && (
+            <button
+              className="icon-button"
+              title="Log out admin"
+              type="button"
+              onClick={() => dispatch(clearAdminSession())}
+            >
+              <LogOut size={17} />
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="admin-workspace">
+        <div className="admin-page-heading">
+          <p className="eyebrow"><ShieldCheck size={15} /> Protected Administration</p>
+          <h1>Manage GATEMIND operations.</h1>
+        </div>
+        <AdminPanel />
+      </main>
+    </div>
+  );
+}
+
+function StudentPortal() {
+  const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+  const [activeView, setActiveView] = useState("profile");
+  const health = useBackendHealth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = "GATEMIND AI";
   }, []);
 
   useEffect(() => {
@@ -128,13 +193,12 @@ export default function App() {
           </div>
           <div className="session-strip">
             <span>{user ? user.profile.full_name : "No student session"}</span>
-            <span>{admin ? admin.profile.full_name : "No admin session"}</span>
-            {(user || admin) && (
+            {user && (
               <button
                 className="icon-button"
-                title="Clear sessions"
+                title="Log out"
                 type="button"
-                onClick={() => dispatch(clearAllSessions())}
+                onClick={() => dispatch(clearUserSession())}
               >
                 <LogOut size={17} />
               </button>
@@ -142,7 +206,7 @@ export default function App() {
           </div>
         </header>
 
-        {!user && activeView !== "admin" ? (
+        {!user ? (
           <section className="hero-panel">
             <div>
               <p className="eyebrow">
@@ -157,7 +221,6 @@ export default function App() {
             {activeView === "profile" && <ProfilePanel />}
             {activeView === "mocktests" && <MockTestPanel />}
             {activeView === "rag" && <RagPanel />}
-            {activeView === "admin" && <AdminPanel />}
           </>
         )}
       </main>

@@ -29,6 +29,10 @@ class BackendFlowTest(unittest.TestCase):
                 "full_name": "Main Admin",
                 "email": "admin@gatemind.ai",
                 "password": "AdminPass123",
+                "phone_number": "+919876543210",
+                "department": "Platform Operations",
+                "employee_id": "GM-FLOW-001",
+                "job_title": "Platform Administrator",
                 "role": "SUPER_ADMIN",
             },
         )

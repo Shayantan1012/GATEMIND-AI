@@ -23,14 +23,23 @@ def services():
 @admin_bp.post("/auth/register")
 def register_admin():
     admin_count = services()["admins_repo"].count()
-    bootstrap_token = current_app.config.get("ADMIN_BOOTSTRAP_TOKEN", "")
-    if admin_count and (
-        not bootstrap_token or request.headers.get("X-Admin-Bootstrap-Token") != bootstrap_token
-    ):
-        return error_response("Admin bootstrap token required", 403)
+    if admin_count:
+        return error_response("Only a logged-in Super Admin can create additional admins", 403)
+    try:
+        payload = request.get_json(silent=True) or {}
+        payload["role"] = "SUPER_ADMIN"
+        admin = services()["admin_auth"].register(payload)
+        return success_response(serialize_admin(admin), "Admin registered", 201)
+    except ValueError as error:
+        return error_response(str(error), 400)
+
+
+@admin_bp.post("/staff")
+@admin_required("SUPER_ADMIN")
+def create_admin_staff(current_admin):
     try:
         admin = services()["admin_auth"].register(request.get_json(silent=True) or {})
-        return success_response(serialize_admin(admin), "Admin registered", 201)
+        return success_response(serialize_admin(admin), "Admin staff account created", 201)
     except ValueError as error:
         return error_response(str(error), 400)
 

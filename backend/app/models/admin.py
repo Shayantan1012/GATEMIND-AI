@@ -14,6 +14,9 @@ class Admin:
     password_hash: str
     phone_number: str
     role: AdminRole
+    employee_id: str = ""
+    job_title: str = ""
+    department: str = ""
     is_verified: bool = True
     account_status: AccountStatus = AccountStatus.ACTIVE
     sessions: list[Session] = field(default_factory=list)
@@ -31,6 +34,9 @@ class Admin:
             "password_hash": self.password_hash,
             "phone_number": self.phone_number,
             "role": self.role.value,
+            "employee_id": self.employee_id,
+            "job_title": self.job_title,
+            "department": self.department,
             "is_verified": self.is_verified,
             "account_status": self.account_status.value,
             "sessions": [session.to_dict() for session in self.sessions],
@@ -46,6 +52,9 @@ class Admin:
             password_hash=data["password_hash"],
             phone_number=data.get("phone_number", ""),
             role=AdminRole(data.get("role", AdminRole.CONTENT_ADMIN.value)),
+            employee_id=data.get("employee_id", ""),
+            job_title=data.get("job_title", ""),
+            department=data.get("department", ""),
             is_verified=data.get("is_verified", True),
             account_status=AccountStatus(data.get("account_status", AccountStatus.ACTIVE.value)),
             sessions=[Session.from_dict(item) for item in data.get("sessions", [])],
@@ -61,4 +70,7 @@ class Admin:
             password_hash=password_hash,
             phone_number=data.get("phone_number", "").strip(),
             role=AdminRole(data.get("role", AdminRole.CONTENT_ADMIN.value)),
+            employee_id=data.get("employee_id", "").strip(),
+            job_title=data.get("job_title", "").strip(),
+            department=data.get("department", "").strip(),
         )

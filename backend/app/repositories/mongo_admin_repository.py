@@ -5,6 +5,9 @@ class MongoAdminRepository:
     def __init__(self, db):
         self.collection = db["admins"]
         self.collection.create_index("email", unique=True)
+        # Some Mongo-compatible providers do not support $ne in partial indexes.
+        # Employee IDs are generated and collision-checked by AdminAuthService.
+        self.collection.create_index("employee_id")
         self.collection.create_index("sessions.refresh_token")
 
     def save(self, admin):
@@ -28,6 +31,9 @@ class MongoAdminRepository:
 
     def exists_by_email(self, email):
         return self.collection.count_documents({"email": email.strip().lower()}, limit=1) > 0
+
+    def exists_by_employee_id(self, employee_id):
+        return self.collection.count_documents({"employee_id": employee_id.strip()}, limit=1) > 0
 
     def count(self):
         return self.collection.count_documents({})

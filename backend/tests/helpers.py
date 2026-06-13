@@ -45,16 +45,42 @@ def register_and_login_student(app, client, email="student@example.com"):
 
 
 def register_and_login_admin(client, email="admin@gatemind.ai", role="SUPER_ADMIN"):
+    initial_email = email if role == "SUPER_ADMIN" else "initial-super-admin@gatemind.ai"
     response = client.post(
         "/api/admin/auth/register",
         json={
             "full_name": "Main Admin",
-            "email": email,
+            "email": initial_email,
             "password": "AdminPass123",
-            "role": role,
+            "phone_number": "+919876543210",
+            "department": "Platform Operations",
+            "job_title": "Platform Administrator",
+            "role": "SUPER_ADMIN",
         },
     )
     assert response.status_code == 201, response.json
+    initial_login = client.post(
+        "/api/admin/auth/login",
+        json={"email": initial_email, "password": "AdminPass123"},
+    )
+    assert initial_login.status_code == 200, initial_login.json
+
+    if role != "SUPER_ADMIN":
+        staff = client.post(
+            "/api/admin/staff",
+            headers=auth_header(initial_login.json["data"]["access_token"]),
+            json={
+                "full_name": "Scoped Admin",
+                "email": email,
+                "password": "AdminPass123",
+                "phone_number": "+919876543211",
+                "department": "Academic Operations",
+                "job_title": role.replace("_", " ").title(),
+                "role": role,
+            },
+        )
+        assert staff.status_code == 201, staff.json
+
     login = client.post("/api/admin/auth/login", json={"email": email, "password": "AdminPass123"})
     assert login.status_code == 200, login.json
     return login.json["data"]

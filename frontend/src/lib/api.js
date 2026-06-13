@@ -52,6 +52,8 @@ export const api = {
       headers: bootstrapToken ? { "X-Admin-Bootstrap-Token": bootstrapToken } : {},
       body: data,
     }),
+  createAdminStaff: (token, data) =>
+    request("/api/admin/staff", { method: "POST", headers: authHeaders(token), body: data }),
   loginAdmin: (email, password) => request("/api/admin/auth/login", { method: "POST", body: { email, password } }),
   dashboard: (token) => request("/api/admin/dashboard", { headers: authHeaders(token) }),
   usersOverview: (token) => request("/api/admin/users", { headers: authHeaders(token) }),
