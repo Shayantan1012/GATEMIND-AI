@@ -50,6 +50,7 @@ def serialize_admin(admin):
         "role": admin.role.value,
         "account_status": admin.account_status.value,
         "is_verified": admin.is_verified,
+        "created_at": admin.created_at.isoformat() if hasattr(admin.created_at, "isoformat") else admin.created_at,
     }
 
 

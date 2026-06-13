@@ -29,6 +29,9 @@ class MongoAdminRepository:
         data = self.collection.find_one({"sessions.refresh_token": token})
         return Admin.from_dict(data) if data else None
 
+    def find_all(self, limit=200):
+        return [Admin.from_dict(item) for item in self.collection.find().sort("created_at", -1).limit(limit)]
+
     def exists_by_email(self, email):
         return self.collection.count_documents({"email": email.strip().lower()}, limit=1) > 0
 
@@ -37,3 +40,7 @@ class MongoAdminRepository:
 
     def count(self):
         return self.collection.count_documents({})
+
+    def delete_by_id(self, admin_id):
+        result = self.collection.delete_one({"_id": admin_id})
+        return result.deleted_count > 0

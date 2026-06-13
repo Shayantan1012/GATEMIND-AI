@@ -1628,9 +1628,15 @@ textarea:focus,
   font-size: 12px;
 }
 
+.user-detail-grid > div {
+  min-width: 0;
+}
+
 .user-detail-grid strong {
   display: block;
   margin-top: 5px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .user-performance-row {

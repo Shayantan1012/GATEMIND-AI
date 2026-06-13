@@ -63,6 +63,49 @@ class AdminApiTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_only_super_admin_can_list_and_delete_admin_staff(self):
+        super_admin = register_and_login_admin(self.client)
+        super_headers = auth_header(super_admin["access_token"])
+        created = self.client.post(
+            "/api/admin/staff",
+            headers=super_headers,
+            json={
+                "full_name": "Support Staff",
+                "email": "support@gatemind.ai",
+                "password": "AdminPass123",
+                "phone_number": "+919876543212",
+                "department": "Student Support",
+                "job_title": "Support Administrator",
+                "role": "SUPPORT_ADMIN",
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        staff_id = created.json["data"]["admin_id"]
+
+        listed = self.client.get("/api/admin/staff", headers=super_headers)
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(len(listed.json["data"]), 2)
+
+        self_delete = self.client.delete(
+            f"/api/admin/staff/{super_admin['admin']['admin_id']}",
+            headers=super_headers,
+        )
+        self.assertEqual(self_delete.status_code, 400)
+
+        support_login = self.client.post(
+            "/api/admin/auth/login",
+            json={"email": "support@gatemind.ai", "password": "AdminPass123"},
+        ).json["data"]
+        self.assertEqual(
+            self.client.get("/api/admin/staff", headers=auth_header(support_login["access_token"])).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/admin/staff/{staff_id}", headers=super_headers).status_code,
+            200,
+        )
+        self.assertEqual(len(self.client.get("/api/admin/staff", headers=super_headers).json["data"]), 1)
+
     def test_admin_registration_requires_staff_contact_information(self):
         response = self.client.post(
             "/api/admin/auth/register",

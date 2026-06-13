@@ -54,6 +54,9 @@ export const api = {
     }),
   createAdminStaff: (token, data) =>
     request("/api/admin/staff", { method: "POST", headers: authHeaders(token), body: data }),
+  listAdminStaff: (token) => request("/api/admin/staff", { headers: authHeaders(token) }),
+  deleteAdminStaff: (token, id) =>
+    request(`/api/admin/staff/${id}`, { method: "DELETE", headers: authHeaders(token) }),
   loginAdmin: (email, password) => request("/api/admin/auth/login", { method: "POST", body: { email, password } }),
   dashboard: (token) => request("/api/admin/dashboard", { headers: authHeaders(token) }),
   usersOverview: (token) => request("/api/admin/users", { headers: authHeaders(token) }),

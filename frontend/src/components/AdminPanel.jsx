@@ -56,6 +56,7 @@ export default function AdminPanel() {
   const dispatch = useDispatch();
   const token = useSelector((state) => state.auth.admin?.accessToken);
   const adminRole = useSelector((state) => state.auth.admin?.profile?.role);
+  const currentAdminId = useSelector((state) => state.auth.admin?.profile?.admin_id);
   const { dashboard, usersOverview, documents, mockTests } = useSelector((state) => state.data);
   const [status, setStatus] = useState(null);
   const [auth, setAuth] = useState({
@@ -72,6 +73,7 @@ export default function AdminPanel() {
   const [subject, setSubject] = useState("Engineering Mathematics");
   const [description, setDescription] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [adminStaff, setAdminStaff] = useState([]);
 
   const can = (...roles) => adminRole === "SUPER_ADMIN" || roles.includes(adminRole);
   const adminTabs = [
@@ -97,6 +99,16 @@ export default function AdminPanel() {
       setActiveTab(adminTabs[0].id);
     }
   }, [adminRole, activeTab]);
+
+  useEffect(() => {
+    if (!token || adminRole !== "SUPER_ADMIN") {
+      setAdminStaff([]);
+      return;
+    }
+    api.listAdminStaff(token)
+      .then(setAdminStaff)
+      .catch((error) => setStatus({ type: "error", text: error.message }));
+  }, [token, adminRole]);
 
   async function adminLogin(event) {
     event.preventDefault();
@@ -131,6 +143,18 @@ export default function AdminPanel() {
         role: token ? "CONTENT_ADMIN" : "SUPER_ADMIN",
       }));
       if (token) await loadAdminData();
+      if (token) setAdminStaff(await api.listAdminStaff(token));
+    } catch (error) {
+      setStatus({ type: "error", text: error.message });
+    }
+  }
+
+  async function deleteAdminStaff(admin) {
+    if (!window.confirm(`Delete admin staff account ${admin.full_name} (${admin.employee_id})?`)) return;
+    try {
+      await api.deleteAdminStaff(token, admin.admin_id);
+      setAdminStaff(await api.listAdminStaff(token));
+      setStatus({ type: "success", text: `${admin.full_name}'s admin account was deleted.` });
     } catch (error) {
       setStatus({ type: "error", text: error.message });
     }
@@ -809,7 +833,53 @@ export default function AdminPanel() {
         </form>
       ) : null}
 
-      {activeTab === "staff" ? adminRegistrationForm() : null}
+      {activeTab === "staff" ? (
+        <div className="stack">
+          {adminRegistrationForm()}
+          <div className="panel">
+            <div className="panel-title-row">
+              <div>
+                <p className="eyebrow"><ShieldCheck size={15} /> Staff Directory</p>
+                <h2>Registered admin staff</h2>
+              </div>
+              <span className="pill pill-success">{adminStaff.length} staff</span>
+            </div>
+            <div className="user-grid">
+              {adminStaff.map((admin) => (
+                <div className="user-card" key={admin.admin_id}>
+                  <div className="panel-title-row compact">
+                    <div>
+                      <strong>{admin.full_name}</strong>
+                      <p className="muted">{admin.employee_id}</p>
+                    </div>
+                    <span className="pill pill-success">{admin.role.replaceAll("_", " ")}</span>
+                  </div>
+                  <div className="user-detail-grid">
+                    <div><span>Email</span><strong>{admin.email}</strong></div>
+                    <div><span>Phone</span><strong>{admin.phone_number}</strong></div>
+                    <div><span>Department</span><strong>{admin.department || "-"}</strong></div>
+                    <div><span>Job title</span><strong>{admin.job_title || "-"}</strong></div>
+                    <div><span>Status</span><strong>{admin.account_status}</strong></div>
+                    <div><span>Verified</span><strong>{admin.is_verified ? "Yes" : "No"}</strong></div>
+                  </div>
+                  {admin.admin_id === currentAdminId ? (
+                    <span className="pill pill-muted">Current account</span>
+                  ) : (
+                    <button
+                      className="secondary-button danger-soft"
+                      type="button"
+                      onClick={() => deleteAdminStaff(admin)}
+                    >
+                      <Trash2 size={16} /> Delete Staff
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!adminStaff.length ? <p className="muted">No admin staff accounts found.</p> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {activeTab === "maintenance" ? (
         <div className="panel">

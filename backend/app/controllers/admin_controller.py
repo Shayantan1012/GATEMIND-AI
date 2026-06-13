@@ -44,6 +44,24 @@ def create_admin_staff(current_admin):
         return error_response(str(error), 400)
 
 
+@admin_bp.get("/staff")
+@admin_required("SUPER_ADMIN")
+def list_admin_staff(current_admin):
+    staff = services()["admins_repo"].find_all()
+    return success_response([serialize_admin(admin) for admin in staff])
+
+
+@admin_bp.delete("/staff/<admin_id>")
+@admin_required("SUPER_ADMIN")
+def delete_admin_staff(current_admin, admin_id):
+    if current_admin.admin_id == admin_id:
+        return error_response("You cannot delete your own active admin account", 400)
+    if not services()["admins_repo"].find_by_id(admin_id):
+        return error_response("Admin staff account not found", 404)
+    services()["admins_repo"].delete_by_id(admin_id)
+    return success_response(message="Admin staff account deleted")
+
+
 @admin_bp.post("/auth/login")
 def login_admin():
     payload = request.get_json(silent=True) or {}
