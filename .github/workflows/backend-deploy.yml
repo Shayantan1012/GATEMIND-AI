@@ -87,11 +87,26 @@ jobs:
       - name: Verify deployment
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ vars.EC2_USER }}
         run: |
+          echo "Checking backend from inside EC2..."
+          ssh -o BatchMode=yes -i ~/.ssh/gatemind "$EC2_USER@$EC2_HOST" '
+            for attempt in {1..12}; do
+              if curl --fail --show-error --silent http://127.0.0.1/api/health; then
+                exit 0
+              fi
+              echo "Internal health check attempt ${attempt}/12 failed"
+              sleep 10
+            done
+            exit 1
+          '
+
+          echo "Checking backend through the EC2 public IP..."
           for attempt in {1..12}; do
-            if curl --fail --silent "http://$EC2_HOST/api/health"; then
+            if curl --connect-timeout 5 --max-time 10 --fail --show-error --silent "http://$EC2_HOST/api/health"; then
               exit 0
             fi
+            echo "Public health check attempt ${attempt}/12 failed"
             sleep 10
           done
           exit 1
@@ -106,4 +121,6 @@ jobs:
             cd /opt/gatemind/source/backend 2>/dev/null || exit 0
             sudo docker compose -f docker-compose.prod.yml ps || true
             sudo docker compose -f docker-compose.prod.yml logs --no-color --tail=200 || true
+            sudo docker inspect --format="{{json .State.Health}}" gatemind-backend || true
+            curl --verbose --max-time 10 http://127.0.0.1/api/health || true
           ' || true
