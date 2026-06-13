@@ -1,4 +1,4 @@
-import { KeyRound, LogIn, MailCheck, UserPlus } from "lucide-react";
+import { KeyRound, LogIn, MailCheck, UserPlus, X } from "lucide-react";
 import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { api } from "../lib/api";
@@ -10,6 +10,7 @@ export default function AuthPanel() {
   const dispatch = useDispatch();
   const [mode, setMode] = useState("login");
   const [status, setStatus] = useState(null);
+  const [previewOtp, setPreviewOtp] = useState("");
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -30,9 +31,13 @@ export default function AuthPanel() {
     setStatus(null);
     try {
       if (mode === "register") {
-        await api.registerUser(form);
+        const result = await api.registerUser(form);
+        if (result.preview_otp) {
+          update("otp", result.preview_otp);
+          setPreviewOtp(result.preview_otp);
+        }
         setMode("verify");
-        setStatus({ type: "success", text: "Registration created. Enter the OTP printed/sent by the backend." });
+        setStatus({ type: "success", text: "Registration created. Enter the verification OTP." });
       }
       if (mode === "verify") {
         await api.verifyOtp(form.otp);
@@ -44,7 +49,11 @@ export default function AuthPanel() {
         setStatus({ type: "success", text: "Student login successful." });
       }
       if (mode === "reset") {
-        await api.forgotPassword(form.email);
+        const result = await api.forgotPassword(form.email);
+        if (result?.preview_otp) {
+          update("otp", result.preview_otp);
+          setPreviewOtp(result.preview_otp);
+        }
         if (form.otp && form.new_password) {
           await api.resetPassword(form.otp, form.new_password);
           setMode("login");
@@ -104,6 +113,21 @@ export default function AuthPanel() {
         {mode === "register" ? "Create Student" : mode === "verify" ? "Verify OTP" : mode === "reset" ? "Reset Password" : "Login"}
       </button>
       <StatusNote status={status} />
+
+      {previewOtp && (
+        <div className="otp-preview-backdrop" role="presentation" onClick={() => setPreviewOtp("")}>
+          <div className="otp-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="otp-preview-title" onClick={(event) => event.stopPropagation()}>
+            <button className="icon-button otp-preview-close" type="button" aria-label="Close OTP popup" onClick={() => setPreviewOtp("")}>
+              <X size={18} />
+            </button>
+            <MailCheck size={28} />
+            <h3 id="otp-preview-title">Your verification OTP</h3>
+            <strong className="otp-preview-code">{previewOtp}</strong>
+            <p>Temporary preview while SMS delivery is being configured.</p>
+            <button className="primary-button" type="button" onClick={() => setPreviewOtp("")}>Continue</button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

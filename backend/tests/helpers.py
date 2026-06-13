@@ -15,6 +15,7 @@ class TestConfig(Config):
     SECRET_KEY = "test-secret"
     ADMIN_BOOTSTRAP_TOKEN = "bootstrap-secret"
     ENABLE_FILE_LOGGING = False
+    OTP_PREVIEW_ENABLED = True
 
 
 def make_app():

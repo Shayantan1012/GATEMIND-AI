@@ -16,7 +16,7 @@ class AuthenticationService:
         self.verification_service = verification_service
         self.pending_users = {}
 
-    def register_user(self, data: dict) -> User:
+    def register_user(self, data: dict) -> tuple[User, str]:
         required_fields = ["full_name", "email", "password", "mobile_number", "branch", "target_gate_year"]
         missing = [field for field in required_fields if not data.get(field)]
         if missing:
@@ -44,9 +44,9 @@ class AuthenticationService:
             target_gate_year=int(data["target_gate_year"]),
             user_profile=UserProfile(profile_id=str(uuid4())),
         )
-        self.verification_service.send_otp(user)
+        otp = self.verification_service.send_otp(user)
         self.pending_users[user.user_id] = user
-        return user
+        return user, otp
 
     def authenticate_user(self, email: str, password: str) -> dict:
         user = self.user_repository.find_by_email(email)

@@ -46,6 +46,7 @@ class Config:
     RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "150"))
     RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
     ADMIN_BOOTSTRAP_TOKEN = os.getenv("ADMIN_BOOTSTRAP_TOKEN", "")
+    OTP_PREVIEW_ENABLED = os.getenv("OTP_PREVIEW_ENABLED", "false").lower() == "true"
 
     TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")

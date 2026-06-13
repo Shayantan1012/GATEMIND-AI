@@ -14,8 +14,11 @@ def get_auth_service():
 @auth_bp.post("/register")
 def register():
     try:
-        user = get_auth_service().register_user(request.get_json(silent=True) or {})
-        return success_response(serialize_user(user), "User registered. OTP sent for verification.", 201)
+        user, otp = get_auth_service().register_user(request.get_json(silent=True) or {})
+        data = {"user": serialize_user(user)}
+        if current_app.config["OTP_PREVIEW_ENABLED"]:
+            data["preview_otp"] = otp
+        return success_response(data, "User registered. OTP sent for verification.", 201)
     except ValueError as error:
         return error_response(str(error), 400)
 
@@ -49,8 +52,9 @@ def logout():
 @auth_bp.post("/forgot-password")
 def forgot_password():
     payload = request.get_json(silent=True) or {}
-    get_auth_service().forgot_password(payload.get("email", ""))
-    return success_response(message="If the email exists, an OTP has been sent.")
+    otp = get_auth_service().forgot_password(payload.get("email", ""))
+    data = {"preview_otp": otp} if otp and current_app.config["OTP_PREVIEW_ENABLED"] else None
+    return success_response(data=data, message="If the email exists, an OTP has been sent.")
 
 
 @auth_bp.post("/verify-otp")

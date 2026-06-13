@@ -741,6 +741,51 @@ textarea:focus,
   background: rgba(202, 95, 70, 0.16);
 }
 
+.otp-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(20, 34, 29, 0.58);
+}
+
+.otp-preview-dialog {
+  position: relative;
+  width: min(100%, 390px);
+  padding: 32px;
+  border: 1px solid #d9e0dc;
+  border-radius: 8px;
+  background: #fffefa;
+  box-shadow: 0 24px 70px rgba(20, 34, 29, 0.25);
+  text-align: center;
+}
+
+.otp-preview-dialog h3 {
+  margin: 14px 0 8px;
+  font-size: 24px;
+}
+
+.otp-preview-dialog p {
+  margin: 12px 0 22px;
+  color: #68766f;
+}
+
+.otp-preview-code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 34px;
+  letter-spacing: 0;
+  color: #1e6655;
+}
+
+.otp-preview-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
 .metric-row {
   display: grid;
   grid-template-columns: repeat(6, minmax(140px, 1fr));

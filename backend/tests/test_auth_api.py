@@ -12,6 +12,23 @@ class AuthApiTest(unittest.TestCase):
         response = self.client.post("/api/auth/register", json={"email": "bad@test.com"})
         self.assertEqual(response.status_code, 400)
 
+    def test_register_returns_preview_otp_when_enabled(self):
+        response = self.client.post(
+            "/api/auth/register",
+            json={
+                "full_name": "Preview Student",
+                "email": "preview@test.com",
+                "password": "Student123",
+                "mobile_number": "+910000000001",
+                "branch": "CSE",
+                "target_gate_year": 2027,
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertRegex(response.json["data"]["preview_otp"], r"^\d{6}$")
+        self.assertEqual(response.json["data"]["user"]["email"], "preview@test.com")
+
     def test_register_verify_login_profile_and_logout(self):
         login = register_and_login_student(self.app, self.client)
         token = login["access_token"]

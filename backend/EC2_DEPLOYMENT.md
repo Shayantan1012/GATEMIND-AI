@@ -84,7 +84,10 @@ UPLOAD_FOLDER=/app/uploads
 ENABLE_FILE_LOGGING=false
 ALLOWED_ORIGINS=https://your-frontend-domain.example
 GROQ_API_KEY=your-groq-key-if-used
+OTP_PREVIEW_ENABLED=false
 ```
+
+Set `OTP_PREVIEW_ENABLED=true` only while SMS delivery is unavailable. It returns OTPs to the requesting frontend and must be disabled after Twilio is configured.
 
 The container port is fixed to `5000` by `docker-compose.prod.yml`; do not add
 `PORT` to this environment file.
