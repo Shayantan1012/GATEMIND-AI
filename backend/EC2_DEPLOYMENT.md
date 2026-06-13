@@ -18,6 +18,32 @@ In the AWS console:
 8. Launch the instance.
 9. Allocate and associate an Elastic IP so the backend address does not change.
 
+### Allocate and Associate an Elastic IP
+
+An Elastic IP keeps the backend public IP stable when the EC2 instance is stopped and started.
+
+1. Open **AWS Console -> EC2 -> Network & Security -> Elastic IP addresses**.
+2. Select **Allocate Elastic IP address**.
+3. Keep **Amazon's pool of IPv4 addresses** selected, then choose **Allocate**.
+4. Select the newly allocated Elastic IP.
+5. Choose **Actions -> Associate Elastic IP address**.
+6. For **Resource type**, select **Instance**.
+7. Select the GATEMIND backend EC2 instance.
+8. Select its private IP address, then choose **Associate**.
+9. Copy the Elastic IP and use it as `EC2_HOST` in GitHub Actions.
+
+After associating it:
+
+- Add `ELASTIC_IP/32` to MongoDB Atlas Network Access.
+- Point the backend domain's DNS `A` record to the Elastic IP.
+- Test the backend at `http://ELASTIC_IP/api/health`.
+
+AWS charges for public IPv4 addresses, including Elastic IPs. Release an Elastic IP after it is no longer needed:
+
+1. Select it under **Elastic IP addresses**.
+2. Choose **Actions -> Disassociate Elastic IP address**.
+3. Choose **Actions -> Release Elastic IP addresses**.
+
 ## 2. Connect to EC2
 
 From PowerShell:
