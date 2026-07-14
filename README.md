@@ -212,6 +212,191 @@ This separation improves cohesion, reduces coupling, and makes the implementatio
 - Domain-specific failures are easier to locate and debug.
 - Common security operations such as hashing and JWT validation are centralized.
 
+### Where each LLD pattern is used
+
+The following map connects the design patterns to the actual modules in the project. Some classes use more than one pattern because they both hide infrastructure details and participate in a larger application workflow.
+
+#### Application startup and configuration
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `create_app()` | Application Factory | Creates and returns a configured Flask application. Tests can supply a different configuration and database. |
+| `create_app()` | Composition Root | Constructs repositories, security services, mock-test services, RAG components, and controllers in one place. |
+| `Config` | Configuration Object | Centralizes environment-controlled database, security, upload, RAG, notification, and provider settings. |
+| `app.extensions["services"]` | Service Registry | Gives controllers access to the fully constructed application services. |
+| Flask blueprints | Modular Controller | Separates authentication, user, administrator, mock-test, and RAG HTTP routes. |
+
+#### Controllers and API responses
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `auth_controller` | MVC Controller | Converts authentication HTTP requests into `AuthenticationService` calls. |
+| `user_controller` | MVC Controller | Coordinates profile, image, password, and progress endpoints. |
+| `admin_controller` | MVC Controller | Coordinates administrator, dashboard, question, test, RAG, and maintenance endpoints. |
+| `mock_test_controller` | MVC Controller | Handles test discovery, submission, and history requests. |
+| `rag_controller` | MVC Controller | Handles ingestion, chat, conversation, and history requests. |
+| Response and schema helpers | DTO/Mapper | Convert internal objects into consistent, safe API response structures. |
+
+Controllers remain thin: they handle HTTP input/output while business decisions remain in services.
+
+#### Repository and database layer
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `MongoUserRepository` | Repository + Adapter | Translates user operations and domain objects into MongoDB queries and documents. |
+| `MongoAdminRepository` | Repository + Adapter | Isolates administrator persistence and role-aware lookup. |
+| `MongoAuditRepository` | Repository + Adapter | Stores administrator audit events. |
+| `MongoPerformanceRepository` | Repository + Adapter | Stores mock-test attempts and performance data. |
+| `MongoQuestionRepository` | Repository + Adapter | Persists questions and mock tests. |
+| `MongoRAGRepository` | Repository + Adapter | Persists documents, chunks, chats, citations, and conversations. |
+| MongoMock | Test Double | Replaces MongoDB during automated tests. |
+
+Repository classes keep PyMongo queries outside controllers and domain services. They also act as adapters between MongoDB documents and application models.
+
+#### Authentication and security
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `AuthenticationService` | Service Layer/Facade | Coordinates registration, verification, login, logout, reset, and refresh operations. |
+| `PasswordService` | Strategy-like Service | Encapsulates password policy, hashing, and verification. |
+| `JWTService` | Facade | Hides PyJWT encoding and decoding behind token-specific operations. |
+| `OTPVerificationService` | Strategy/Coordinator | Encapsulates OTP creation, expiry, delivery, and verification. |
+| `SMSNotificationService` | Adapter | Converts an application notification into an SMS-provider call or fallback behavior. |
+| Authentication middleware | Guard/Proxy | Validates authentication and authorization before a protected controller executes. |
+| `Session` | Domain Model | Represents login-session state, tokens, activity, and expiry. |
+
+`AuthenticationService` demonstrates constructor-based Dependency Injection because the repository, password service, JWT service, and verification service are supplied from outside.
+
+#### Administration
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `AdminAuthService` | Service Layer | Coordinates administrator registration, roles, authentication, and sessions. |
+| `AdminDashboardService` | Facade/Query Service | Aggregates information from several repositories into one dashboard result. |
+| `AuditLogger` | Observer-style Service | Records important administrator actions separately from core controller logic. |
+| `StorageMaintenanceService` | Command-style Service | Encapsulates a privileged cleanup operation as one controlled action. |
+| Role checks | Guard | Prevent unauthorized administrator operations. |
+
+#### Question bank and mock tests
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| Question factory | Factory | Creates the appropriate question model for MCQ, MSQ, NAT, or another supported type. |
+| Evaluation implementations | Strategy | Apply different comparison and marking rules for different question types. |
+| `QuestionEvaluator` | Strategy Context | Chooses and runs an evaluation strategy through one interface. |
+| `QuestionBankService` | Service Layer | Coordinates validation and question persistence. |
+| `MockTestService` | Application Service/Facade | Coordinates retrieval, evaluation, storage, analysis, and personalization. |
+| `PerformanceAnalyzer` | Domain Service | Calculates subject-wise marks, correctness, unanswered count, and percentage. |
+| `PersonalizedRAGUpdater` | Observer-style Update | Updates the learning profile after performance changes. |
+
+Strategy prevents the complete mock-test workflow from containing separate hard-coded evaluation logic for every question type.
+
+#### Document parsing
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| Parser contract | Strategy | Defines the common document-to-text operation. |
+| PDF, text, CSV, JSON, and image parsers | Concrete Strategies | Implement file-type-specific extraction behind the same contract. |
+| Image/OCR parser | Strategy + Adapter | Adapts Pillow/Tesseract processing to the common parser interface. |
+| `DocumentParserFactory` | Factory | Selects a parser using the uploaded file type. |
+
+A future DOCX parser can be added as another implementation and registered with the factory without rewriting the indexing pipeline.
+
+#### Chunking and indexing
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| Chunking contract | Strategy | Defines how extracted documents are divided. |
+| `RecursiveChunkingStrategy` | Concrete Strategy | Performs configurable recursive splitting with overlap. |
+| Indexing pipeline abstraction | Template Method | Defines the stable parse, chunk, embed, enrich, and store sequence. |
+| `LangChainIndexingPipeline` | Concrete Template | Executes the indexing sequence with the selected components. |
+
+Template Method preserves the ingestion workflow, while Strategy allows individual algorithms to change.
+
+#### Embeddings and LLM providers
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `EmbeddingFactory` | Factory | Selects OpenAI, Hugging Face, or deterministic local embeddings from configuration. |
+| Embedding implementations | Strategy + Adapter | Present one embedding interface over different providers. |
+| `LLMServiceFactory` | Factory | Selects the configured answer-generation implementation. |
+| OpenAI/Groq services | Adapter | Hide provider-specific SDK behavior behind the application interface. |
+| Local fallback | Null Object/Fallback Strategy | Keeps development and tests usable without external AI credentials. |
+
+Factories keep provider-specific construction logic outside `RAGChatService`.
+
+#### Vector storage and retrieval
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| Vector-store contract | Adapter Interface | Defines the add and search operations expected by RAG services. |
+| `MongoVectorStoreAdapter` | Adapter | Makes MongoDB-backed chunks behave like the required vector store. |
+| Retriever contract | Strategy | Defines query-to-document retrieval behavior. |
+| `HybridRetriever` | Concrete Strategy | Embeds queries, translates filters, and performs hybrid candidate retrieval. |
+| `HybridReranker` | Strategy | Orders retrieved candidates using their score and deterministic tie-breaking. |
+
+The adapter can later be replaced by MongoDB Atlas Vector Search, FAISS, Pinecone, or another vector database without modifying the chat controller.
+
+#### RAG answer generation
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `ContextBuilder` | Builder | Constructs model context from retrieved chunks and learning-profile data. |
+| `RAGChatService` | Facade/Application Service | Coordinates ownership validation, retrieval, reranking, history, generation, citations, and persistence. |
+| `Citation` | Value Object/DTO | Represents immutable citation information returned with an answer. |
+| `RAGResponse` | DTO | Carries the generated answer and citations across layers. |
+
+The controller calls one `ask()` method while the RAG facade coordinates the complete pipeline internally.
+
+#### Personalization
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `UserProfile` | Domain Model | Holds learning preferences, progress, and subject performance. |
+| `PerformanceAnalyzer` | Domain Service | Converts answer-level results into subject-level evidence. |
+| `PersonalizedRAGUpdater` | Observer-style Update | Propagates new test performance into the profile. |
+| `ContextBuilder` | Builder | Adds selected profile information to the RAG context. |
+
+The current observer-style update is synchronous. A future event-driven implementation could publish `MockTestSubmitted` and let separate subscribers update personalization, analytics, and recommendations.
+
+#### Frontend
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| `frontend/src/lib/api.js` | Facade | Exposes one simple JavaScript interface over all backend endpoints. |
+| `request()` | Template Function | Reuses the same header, body, fetch, parsing, and error-handling sequence. |
+| `authHeaders()` | Policy/Utility | Centralizes bearer-token header construction. |
+| Redux Toolkit store | Flux/Unidirectional Data Flow | Makes shared state transitions predictable. |
+| React components | Composite | Builds complex interfaces from smaller reusable components. |
+| React hooks | Observer Mechanism | Re-render components when local or global state changes. |
+| Protected views | Guard | Restrict student and administrator screens according to authentication state. |
+
+#### Deployment and infrastructure
+
+| Component | Pattern | How it is used |
+|---|---|---|
+| Gunicorn | Process Pool | Serves requests through managed worker processes. |
+| Docker image | Immutable Server | Packages a repeatable backend runtime. |
+| Docker health check | Health Endpoint/Watchdog | Detects whether the backend can serve requests. |
+| Vercel `/api` proxy | Reverse Proxy | Routes frontend API calls to the backend. |
+| GitHub Actions | Pipeline | Validates, builds, deploys, and verifies changes in a repeatable sequence. |
+| Environment variables | Externalized Configuration | Keep deployment settings and secrets outside source code. |
+
+### Requirement-to-pattern summary
+
+| Product capability | Principal patterns |
+|---|---|
+| Authentication | Service Layer, Repository, Adapter, Guard, Dependency Injection, Domain Model |
+| User profiles | Service Layer, Repository, Domain Model, DTO Mapper |
+| Document upload | Factory, Strategy, Adapter, Template Method |
+| RAG indexing | Factory, Strategy, Adapter, Template Method, Repository |
+| RAG chatbot | Facade, Builder, Strategy, DTO, Repository |
+| Mock tests | Factory, Strategy, Service Layer, Repository |
+| Personalization | Domain Service, Observer-style Update, Builder, Repository |
+| Administration | Service Layer, Facade, Guard, Command-style Service, Repository |
+
+> **Pattern terminology:** Factory, Strategy, Adapter, Template Method, Builder, Facade, Composite, and Observer are commonly recognized object-oriented design patterns. Repository, Service Layer, Dependency Injection, DTO, Composition Root, Guard, and Externalized Configuration are architectural or enterprise application patterns. The project currently uses observer-style and command-style services rather than a formal event bus or full command queue.
+
 ## RAG Pipeline
 
 ```mermaid
