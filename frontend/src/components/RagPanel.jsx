@@ -67,8 +67,11 @@ export default function RagPanel() {
     event.stopPropagation();
     if (!window.confirm("Delete this conversation and all its messages?")) return;
     try {
-      await api.deleteRagConversation(token, conversationId);
+      const attachedDocumentIds = activeConversationId === conversationId ? selectedDocumentIds : [];
+      await api.deleteRagConversation(token, conversationId, attachedDocumentIds);
       dispatch(removeRagConversation(conversationId));
+      setSelectedDocumentIds((current) => current.filter((id) => !attachedDocumentIds.includes(id)));
+      await dispatch(loadUserRagDocuments(token)).unwrap();
       if (activeConversationId === conversationId) newChat();
     } catch (error) {
       setStatus({ type: "error", text: error.message });

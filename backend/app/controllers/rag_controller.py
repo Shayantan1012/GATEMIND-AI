@@ -134,8 +134,9 @@ def chat_history(current_user):
 @rag_bp.delete("/conversations/<conversation_id>")
 @token_required
 def delete_conversation(current_user, conversation_id):
+    payload = request.get_json(silent=True) or {}
     try:
-        service().delete_conversation(current_user.user_id, conversation_id)
+        service().delete_conversation(current_user.user_id, conversation_id, payload.get("document_ids"))
         return success_response(message="Conversation deleted")
     except ValueError as error:
         return error_response(str(error), 404)

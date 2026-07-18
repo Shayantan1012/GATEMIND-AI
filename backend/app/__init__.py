@@ -130,6 +130,7 @@ def create_app(config_class=Config, database=None):
         LLMServiceFactory.create(app.config),
         user_repository,
         app.config["RAG_TOP_K"],
+        app.config["UPLOAD_FOLDER"],
     )
 
     app.extensions["services"] = {

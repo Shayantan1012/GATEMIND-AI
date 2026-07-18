@@ -1,5 +1,7 @@
 import unittest
 import io
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from tests.helpers import (
     auth_header,
@@ -97,6 +99,99 @@ class RagApiTest(unittest.TestCase):
         self.assertEqual(deleted.status_code, 200)
         missing = self.client.get(f"/api/rag/conversations/{first_id}/messages", headers=headers)
         self.assertEqual(missing.status_code, 404)
+
+    def test_deleting_conversation_deletes_attached_user_documents_and_files(self):
+        with TemporaryDirectory() as temporary_directory:
+            self.app.config["UPLOAD_FOLDER"] = temporary_directory
+            self.app.extensions["services"]["rag_chat"].upload_folder = Path(temporary_directory)
+            headers = auth_header(self.student["access_token"])
+            conversation = self.client.post("/api/rag/conversations", headers=headers, json={"title": "Attached notes"})
+            conversation_id = conversation.json["data"]["conversation_id"]
+            uploaded = self.client.post(
+                "/api/rag/documents",
+                headers=headers,
+                data={"files": [(io.BytesIO(b"SD index compares scatter and separation."), "sd-index.txt")]},
+                content_type="multipart/form-data",
+            )
+            self.assertEqual(uploaded.status_code, 201)
+            document = uploaded.json["data"][0]
+            document_id = document["_id"]
+            uploaded_file = Path(temporary_directory) / "users" / self.student["user"]["user_id"] / document["source"]
+            self.assertTrue(uploaded_file.exists())
+
+            chat = self.client.post(
+                "/api/rag/chat",
+                headers=headers,
+                json={
+                    "conversation_id": conversation_id,
+                    "query": "What does the SD index compare?",
+                    "filters": {"document_ids": [document_id]},
+                },
+            )
+            self.assertEqual(chat.status_code, 200)
+            self.assertTrue(self.app.extensions["services"]["rag_repo"].find_document(document_id))
+            self.assertTrue(self.app.extensions["services"]["rag_repo"].list_chunks({"document_id": document_id}))
+
+            deleted = self.client.delete(f"/api/rag/conversations/{conversation_id}", headers=headers)
+            self.assertEqual(deleted.status_code, 200)
+            self.assertIsNone(self.app.extensions["services"]["rag_repo"].find_document(document_id))
+            self.assertEqual(self.app.extensions["services"]["rag_repo"].list_chunks({"document_id": document_id}), [])
+            self.assertFalse(uploaded_file.exists())
+
+    def test_deleting_conversation_deletes_selected_unqueried_documents(self):
+        with TemporaryDirectory() as temporary_directory:
+            self.app.config["UPLOAD_FOLDER"] = temporary_directory
+            self.app.extensions["services"]["rag_chat"].upload_folder = Path(temporary_directory)
+            headers = auth_header(self.student["access_token"])
+            conversation = self.client.post("/api/rag/conversations", headers=headers, json={"title": "Unasked upload"})
+            conversation_id = conversation.json["data"]["conversation_id"]
+            uploaded = self.client.post(
+                "/api/rag/documents",
+                headers=headers,
+                data={"files": [(io.BytesIO(b"Uploaded but not queried yet."), "unused.txt")]},
+                content_type="multipart/form-data",
+            )
+            document = uploaded.json["data"][0]
+            document_id = document["_id"]
+            uploaded_file = Path(temporary_directory) / "users" / self.student["user"]["user_id"] / document["source"]
+            self.assertTrue(uploaded_file.exists())
+
+            deleted = self.client.delete(
+                f"/api/rag/conversations/{conversation_id}",
+                headers=headers,
+                json={"document_ids": [document_id]},
+            )
+            self.assertEqual(deleted.status_code, 200)
+            self.assertIsNone(self.app.extensions["services"]["rag_repo"].find_document(document_id))
+            self.assertFalse(uploaded_file.exists())
+
+    def test_deleting_conversation_keeps_admin_documents_and_chunks(self):
+        uploaded = upload_text_document(self.client, self.admin["access_token"])
+        self.assertEqual(uploaded.status_code, 201)
+        document_id = uploaded.json["data"]["_id"]
+        headers = auth_header(self.student["access_token"])
+        conversation = self.client.post("/api/rag/conversations", headers=headers, json={"title": "Admin notes"})
+        conversation_id = conversation.json["data"]["conversation_id"]
+
+        chat = self.client.post(
+            "/api/rag/chat",
+            headers=headers,
+            json={
+                "conversation_id": conversation_id,
+                "query": "What does BIRCH build?",
+                "filters": {"document_ids": [document_id]},
+            },
+        )
+        self.assertEqual(chat.status_code, 400)
+
+        deleted = self.client.delete(
+            f"/api/rag/conversations/{conversation_id}",
+            headers=headers,
+            json={"document_ids": [document_id]},
+        )
+        self.assertEqual(deleted.status_code, 200)
+        self.assertIsNotNone(self.app.extensions["services"]["rag_repo"].find_document(document_id))
+        self.assertTrue(self.app.extensions["services"]["rag_repo"].list_chunks({"document_id": document_id}))
 
     def test_user_cannot_access_another_users_conversation(self):
         headers = auth_header(self.student["access_token"])

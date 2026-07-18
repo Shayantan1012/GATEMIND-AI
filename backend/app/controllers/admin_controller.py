@@ -214,6 +214,7 @@ def upload_rag_document(current_admin):
             target,
             current_admin.admin_id,
             {
+                "owner_type": "admin",
                 "subject": request.form.get("subject", ""),
                 "description": description,
                 "original_name": uploaded_file.filename,

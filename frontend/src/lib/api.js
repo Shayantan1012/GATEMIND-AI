@@ -93,7 +93,12 @@ export const api = {
     request("/api/rag/conversations", { method: "POST", headers: authHeaders(token), body: { title } }),
   listRagConversations: (token) => request("/api/rag/conversations", { headers: authHeaders(token) }),
   getRagConversationMessages: (token, id) => request(`/api/rag/conversations/${id}/messages`, { headers: authHeaders(token) }),
-  deleteRagConversation: (token, id) => request(`/api/rag/conversations/${id}`, { method: "DELETE", headers: authHeaders(token) }),
+  deleteRagConversation: (token, id, documentIds = []) =>
+    request(`/api/rag/conversations/${id}`, {
+      method: "DELETE",
+      headers: authHeaders(token),
+      body: documentIds.length ? { document_ids: documentIds } : undefined,
+    }),
   listRagDocuments: (token) => request("/api/rag/documents", { headers: authHeaders(token) }),
   uploadRagFiles: (token, files) => {
     const formData = new FormData();

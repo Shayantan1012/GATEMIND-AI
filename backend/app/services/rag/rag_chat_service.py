@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 from app.models.rag import Citation, RAGResponse
@@ -11,7 +12,7 @@ class RAGChatService:
         "cite the relevant source numbers when applicable, and do not make up information. "
         "If the context is insufficient, explicitly state that you do not have enough information."
     )
-    def __init__(self, repository, retriever, reranker, context_builder, llm_service, users, top_k):
+    def __init__(self, repository, retriever, reranker, context_builder, llm_service, users, top_k, upload_folder=None):
         self.repository = repository
         self.retriever = retriever
         self.reranker = reranker
@@ -19,6 +20,7 @@ class RAGChatService:
         self.llm_service = llm_service
         self.users = users
         self.top_k = top_k
+        self.upload_folder = Path(upload_folder) if upload_folder else None
 
     def create_conversation(self, user_id: str, title: str = "New chat") -> dict:
         now = datetime.now(timezone.utc)
@@ -103,10 +105,51 @@ class RAGChatService:
             raise ValueError("Conversation not found")
         return self.repository.list_chats(user_id, conversation_id)
 
-    def delete_conversation(self, user_id: str, conversation_id: str) -> bool:
+    def delete_conversation(self, user_id: str, conversation_id: str, document_ids: list[str] | None = None) -> bool:
+        messages = self.repository.list_chats(user_id, conversation_id)
+        attached_document_ids = self._document_ids_from_messages(messages)
+        attached_document_ids.update(document_ids or [])
+        self._delete_user_documents(user_id, attached_document_ids)
         if not self.repository.delete_conversation(conversation_id, user_id):
             raise ValueError("Conversation not found")
         return True
+
+    def _delete_user_documents(self, user_id: str, document_ids: set[str]):
+        if not document_ids:
+            return
+        documents = self.repository.find_documents_by_ids(document_ids)
+        for document in documents:
+            if document.get("uploaded_by") != user_id:
+                continue
+            if document.get("metadata", {}).get("owner_type") != "user":
+                continue
+            self._delete_uploaded_file(user_id, document)
+            self.repository.delete_document(document["_id"])
+
+    def _delete_uploaded_file(self, user_id: str, document: dict):
+        if not self.upload_folder:
+            return
+        user_folder = (self.upload_folder / "users" / user_id).resolve()
+        target = (user_folder / document.get("source", "")).resolve()
+        if user_folder not in target.parents or not target.is_file():
+            return
+        target.unlink()
+        try:
+            user_folder.rmdir()
+        except OSError:
+            pass
+
+    @staticmethod
+    def _document_ids_from_messages(messages: list[dict]) -> set[str]:
+        document_ids = set()
+        for message in messages:
+            document_ids.update(message.get("filters", {}).get("document_ids", []))
+            document_ids.update(
+                citation.get("document_id")
+                for citation in message.get("citations", [])
+                if citation.get("document_id")
+            )
+        return document_ids
 
     @staticmethod
     def _title_from_query(query: str) -> str:
