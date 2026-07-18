@@ -6,10 +6,11 @@ from app.models.rag import Citation, RAGResponse
 
 class RAGChatService:
     SYSTEM_PROMPT = (
-        "You are GATEMIND, a precise GATE preparation assistant. Answer using only the supplied "
-        "context. Explain reasoning clearly, mention uncertainty, and refer to citation numbers."
+        "You are GATEMIND, a personalized GATE preparation assistant. "
+        "Answer only using the provided context. Explain concepts clearly and concisely, "
+        "cite the relevant source numbers when applicable, and do not make up information. "
+        "If the context is insufficient, explicitly state that you do not have enough information."
     )
-
     def __init__(self, repository, retriever, reranker, context_builder, llm_service, users, top_k):
         self.repository = repository
         self.retriever = retriever
@@ -44,7 +45,7 @@ class RAGChatService:
         if document_ids:
             documents = self.repository.find_documents_by_ids(document_ids)
             owned_ids = {item["_id"] for item in documents if item.get("uploaded_by") == user_id}
-            if owned_ids != set(document_ids):
+            if owned_ids != set(document_ids):                                       
                 raise ValueError("One or more attached documents are unavailable")
         retrieved = self.reranker.rerank(self.retriever.retrieve(query, filters))[: self.top_k]
         user = self.users.find_by_id(user_id)

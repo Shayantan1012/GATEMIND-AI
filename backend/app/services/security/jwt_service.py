@@ -1,8 +1,5 @@
 from datetime import datetime, timedelta, timezone
-
 import jwt
-
-
 class JWTService:
     def __init__(self, secret_key: str):
         self.secret_key = secret_key

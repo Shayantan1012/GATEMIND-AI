@@ -63,7 +63,6 @@ def create_app(config_class=Config, database=None):
 
         if app.config["MONGO_USE_MOCK"]:
 
-
             import mongomock
 
             mongo_client = mongomock.MongoClient()
@@ -111,7 +110,9 @@ def create_app(config_class=Config, database=None):
         PerformanceAnalyzer(),
         PersonalizedRAGUpdater(user_repository),
     )
-
+#-------------------------------------------------------------------------------------------- 
+#--------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------
     embeddings = EmbeddingFactory.create(app.config)
     vector_store = MongoVectorStoreAdapter(rag_repository)
     rag_indexer = LangChainIndexingPipeline(

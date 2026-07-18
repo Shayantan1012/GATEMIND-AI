@@ -21,7 +21,7 @@ class UserService:
         preferred_subjects = data.get("preferred_subjects")
         if preferred_subjects is not None:
             normalized_subjects = []
-            seen_subjects = set()
+            seen_subjects = set()   
             for subject in preferred_subjects:
                 cleaned = str(subject).strip()
                 key = cleaned.lower()
@@ -39,14 +39,12 @@ class UserService:
         profile.daily_study_goal_hours = self._coerce_float(data.get("daily_study_goal_hours"), profile.daily_study_goal_hours, minimum=0.0, maximum=24.0)
         profile.weekly_mock_test_goal = self._coerce_int(data.get("weekly_mock_test_goal"), profile.weekly_mock_test_goal, minimum=0, maximum=14)
         profile.exam_goal_score = self._coerce_int(data.get("exam_goal_score"), profile.exam_goal_score, minimum=0, maximum=1000)
-
         branch = data.get("branch")
         if branch:
             normalized_branch = str(branch).strip().upper()
             if normalized_branch not in Branch._value2member_map_:
                 raise ValueError("Invalid branch selected")
             user.branch = Branch(normalized_branch)
-
         self.user_repository.update(user)
         return user
 

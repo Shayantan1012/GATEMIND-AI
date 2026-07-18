@@ -132,7 +132,7 @@ class QuestionBankService:
         options = [str(option).strip() for option in item.get("options", []) if str(option).strip()]
         if question_type in {"MCQ", "MSQ"} and len(options) < 2:
             raise ValueError("MCQ and MSQ questions require at least two options")
-
+                                                                
         correct_answer = item.get("correct_answer")
         if question_type == "MSQ":
             if not isinstance(correct_answer, list) or not correct_answer:

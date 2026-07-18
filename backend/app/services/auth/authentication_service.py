@@ -98,7 +98,7 @@ class AuthenticationService:
         user.password_hash = self.password_service.hash_password(new_password)
         self.user_repository.update(user)
         return True
-
+    
     def verify_otp(self, otp: str) -> User:
         user_id = self.verification_service.verify_otp(otp)
         if not user_id:

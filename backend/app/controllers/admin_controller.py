@@ -152,6 +152,7 @@ def create_mock_test(current_admin):
         return error_response(str(error), 400)
 
 
+
 @admin_bp.get("/mock-tests")
 @admin_required("MOCKTEST_ADMIN", "ANALYTICS_ADMIN")
 def list_mock_tests(current_admin):
@@ -236,6 +237,8 @@ def list_rag_documents(current_admin):
     return success_response(documents)
 
 
+# /////////////////////////////////////////////////////////////////////////////////////
+
 @admin_bp.delete("/rag/documents/<document_id>")
 @admin_required("CONTENT_ADMIN")
 def delete_rag_document(current_admin, document_id):
@@ -245,6 +248,7 @@ def delete_rag_document(current_admin, document_id):
     services()["rag_repo"].delete_document(document_id)
     return success_response(message="Document deleted")
 
+# /////////////////////////////////////////////////////////////////////////////////////
 
 @admin_bp.delete("/maintenance/storage")
 @admin_required("SUPER_ADMIN")
