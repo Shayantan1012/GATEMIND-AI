@@ -202,3 +202,4 @@ For the current simple setup, `frontend/vercel.json` proxies:
 ```
 
 If your EC2 IP changes, update `frontend/vercel.json` and redeploy Vercel.
+CHANGED EC2
