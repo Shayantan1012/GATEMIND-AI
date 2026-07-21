@@ -54,3 +54,5 @@ class Config:
     EMAIL_SMTP_USERNAME = os.getenv("EMAIL_SMTP_USERNAME", "")
     EMAIL_SMTP_PASSWORD = os.getenv("EMAIL_SMTP_PASSWORD", "")
     EMAIL_FROM_ADDRESS = os.getenv("EMAIL_FROM_ADDRESS", "no-reply@gatemind.ai")
+
+# 
