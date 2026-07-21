@@ -51,4 +51,12 @@ jobs:
       - name: Check backend
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
-        run: curl --fail "http://$EC2_HOST/api/health"
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl --fail --silent "http://$EC2_HOST/api/health"; then
+              exit 0
+            fi
+            echo "Backend not ready yet. Attempt $attempt/10"
+            sleep 15
+          done
+          exit 1
