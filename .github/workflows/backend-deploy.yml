@@ -10,117 +10,45 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: backend-production
-  cancel-in-progress: false
-
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Validate deployment settings
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-          EC2_USER: ${{ vars.EC2_USER }}
-        run: |
-          test -n "$EC2_HOST" || { echo "::error::Missing repository secret EC2_HOST"; exit 1; }
-          test -n "$EC2_SSH_PRIVATE_KEY" || { echo "::error::Missing repository secret EC2_SSH_PRIVATE_KEY"; exit 1; }
-          test -n "$EC2_USER" || { echo "::error::Missing repository variable EC2_USER"; exit 1; }
-
-      - name: Configure SSH
+      - name: Setup SSH key
         env:
           EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > ~/.ssh/gatemind
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_PRIVATE_KEY" > ~/.ssh/gatemind
           chmod 600 ~/.ssh/gatemind
           ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
-          ssh-keygen -y -f ~/.ssh/gatemind > /dev/null
 
       - name: Package backend
         run: tar --exclude='backend/uploads' --exclude='backend/.env' -czf backend.tar.gz backend
 
-      - name: Upload backend
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ vars.EC2_USER }}
-        run: scp -o BatchMode=yes -i ~/.ssh/gatemind backend.tar.gz "$EC2_USER@$EC2_HOST:/tmp/backend.tar.gz"
-
-      - name: Deploy backend container
+      - name: Upload and restart on EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ vars.EC2_USER }}
         run: |
-          ssh -o BatchMode=yes -i ~/.ssh/gatemind "$EC2_USER@$EC2_HOST" '
+          scp -i ~/.ssh/gatemind backend.tar.gz "$EC2_USER@$EC2_HOST:/tmp/backend.tar.gz"
+          ssh -i ~/.ssh/gatemind "$EC2_USER@$EC2_HOST" '
             set -e
-            BUILDX_VERSION=v0.20.1
-            sudo mkdir -p /usr/local/lib/docker/cli-plugins
-            sudo curl --fail --silent --show-error --location \
-              "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64" \
-              --output /usr/local/lib/docker/cli-plugins/docker-buildx
-            sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
-            sudo docker buildx version
             sudo mkdir -p /opt/gatemind/source /opt/gatemind/uploads
             sudo rm -rf /opt/gatemind/source/backend
             sudo tar -xzf /tmp/backend.tar.gz -C /opt/gatemind/source
-            sudo chown -R 999:999 /opt/gatemind/uploads
             cd /opt/gatemind/source/backend
-            test -f /opt/gatemind/backend.env || { echo "Missing /opt/gatemind/backend.env"; exit 1; }
-            sudo docker compose -f docker-compose.prod.yml up -d --build --remove-orphans || {
-              sudo docker compose -f docker-compose.prod.yml logs --no-color --tail=200
-              exit 1
-            }
-            sudo docker compose -f docker-compose.prod.yml ps
-            sudo docker image prune -f
+            sudo docker compose -f docker-compose.prod.yml up -d --build
             rm -f /tmp/backend.tar.gz
           '
 
-      - name: Verify deployment
+      - name: Check backend
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ vars.EC2_USER }}
-        run: |
-          echo "Checking backend from inside EC2..."
-          ssh -o BatchMode=yes -i ~/.ssh/gatemind "$EC2_USER@$EC2_HOST" '
-            for attempt in {1..36}; do
-              if curl --fail --show-error --silent http://127.0.0.1/api/health; then
-                exit 0
-              fi
-              echo "Internal health check attempt ${attempt}/36 failed"
-              sleep 10
-            done
-            exit 1
-          '
-
-          echo "Checking backend through the EC2 public IP..."
-          for attempt in {1..12}; do
-            if curl --connect-timeout 5 --max-time 10 --fail --show-error --silent "http://$EC2_HOST/api/health"; then
-              exit 0
-            fi
-            echo "Public health check attempt ${attempt}/12 failed"
-            sleep 10
-          done
-          exit 1
-
-      - name: Show backend diagnostics
-        if: failure()
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ vars.EC2_USER }}
-        run: |
-          ssh -o BatchMode=yes -i ~/.ssh/gatemind "$EC2_USER@$EC2_HOST" '
-            cd /opt/gatemind/source/backend 2>/dev/null || exit 0
-            sudo docker compose -f docker-compose.prod.yml ps || true
-            sudo docker compose -f docker-compose.prod.yml logs --no-color --tail=200 || true
-            sudo docker inspect --format="{{json .State.Health}}" gatemind-backend || true
-            curl --verbose --max-time 10 http://127.0.0.1/api/health || true
-          ' || true
+        run: curl --fail "http://$EC2_HOST/api/health"

@@ -1,59 +1,65 @@
-# Deploy GATEMIND Backend Directly to EC2
+# Simple EC2 Backend Deployment
 
-This deployment uses one EC2 instance and Docker Compose. Terraform, ECS, ECR, and a load balancer are not required.
+This is a personal-project deployment. It uses:
 
-## 1. Create the EC2 Instance
+- One EC2 instance
+- Docker Compose
+- GitHub Actions
+- No Terraform, ECR, ECS, load balancer, or production HTTPS setup
 
-In the AWS console:
+## 1. EC2 Setup
 
-1. Open **EC2 -> Launch instance**.
-2. Name it `gatemind-backend`.
-3. Select **Amazon Linux 2023**.
-4. Select `t3.small`. Use `t3.micro` only for light testing.
-5. Create and download an RSA `.pem` key pair.
-6. Configure at least 30 GB gp3 storage.
-7. Allow inbound:
-   - SSH `22` from **My IP**
-   - HTTP `80` from `0.0.0.0/0`
-   - HTTPS `443` from `0.0.0.0/0` when HTTPS is configured
-8. Launch the instance.
-9. Allocate and associate an Elastic IP so the backend address does not change.
+Create an EC2 instance:
 
-### Allocate and Associate an Elastic IP
+- AMI: Amazon Linux 2023
+- Instance type: `t3.small`
+- Storage: 30 GB
+- Key pair: create/download `.pem`
+- Security group:
+  - SSH `22` from **My IP**
+  - HTTP `80` from `0.0.0.0/0`
 
-An Elastic IP keeps the backend public IP stable when the EC2 instance is stopped and started.
+Use an Elastic IP if you do not want the backend IP to change after restart.
 
-1. Open **AWS Console -> EC2 -> Network & Security -> Elastic IP addresses**.
-2. Select **Allocate Elastic IP address**.
-3. Keep **Amazon's pool of IPv4 addresses** selected, then choose **Allocate**.
-4. Select the newly allocated Elastic IP.
-5. Choose **Actions -> Associate Elastic IP address**.
-6. For **Resource type**, select **Instance**.
-7. Select the GATEMIND backend EC2 instance.
-8. Select its private IP address, then choose **Associate**.
-9. Copy the Elastic IP and use it as `EC2_HOST` in GitHub Actions.
+### Add an Elastic IP
 
-After associating it:
+Elastic IP means a fixed public IP for your EC2 instance. Use this if you want GitHub Actions, MongoDB Atlas, and Vercel to keep using the same backend IP.
 
-- Add `ELASTIC_IP/32` to MongoDB Atlas Network Access.
-- Point the backend domain's DNS `A` record to the Elastic IP.
-- Test the backend at `http://ELASTIC_IP/api/health`.
+1. Go to **AWS Console -> EC2**.
+2. In the left menu, open **Elastic IPs**.
+3. Click **Allocate Elastic IP address**.
+4. Keep the default option selected.
+5. Click **Allocate**.
+6. Select the new Elastic IP.
+7. Click **Actions -> Associate Elastic IP address**.
+8. For **Resource type**, choose **Instance**.
+9. Select your GATEMIND EC2 instance.
+10. Select the private IP shown for that instance.
+11. Click **Associate**.
 
-AWS charges for public IPv4 addresses, including Elastic IPs. Release an Elastic IP after it is no longer needed:
+After this, copy the Elastic IP and use it in these places:
 
-1. Select it under **Elastic IP addresses**.
-2. Choose **Actions -> Disassociate Elastic IP address**.
-3. Choose **Actions -> Release Elastic IP addresses**.
+- GitHub Actions secret `EC2_HOST`
+- MongoDB Atlas Network Access as `YOUR_ELASTIC_IP/32`
+- `frontend/vercel.json` proxy URL
+- Browser test URL: `http://YOUR_ELASTIC_IP/api/health`
+
+If you delete the EC2 instance later, release the Elastic IP too, otherwise AWS may still charge for it:
+
+1. EC2 -> **Elastic IPs**
+2. Select the Elastic IP
+3. **Actions -> Disassociate Elastic IP address**
+4. **Actions -> Release Elastic IP addresses**
 
 ## 2. Connect to EC2
 
 From PowerShell:
 
 ```powershell
-ssh -i "C:\path\to\gatemind.pem" ec2-user@YOUR_EC2_ELASTIC_IP
+ssh -i "C:\path\to\gatemind.pem" ec2-user@YOUR_EC2_IP
 ```
 
-If Windows reports that the private key permissions are too open:
+If Windows says the key permissions are too open:
 
 ```powershell
 $key = "C:\path\to\gatemind.pem"
@@ -61,47 +67,36 @@ icacls $key /inheritance:r
 icacls $key /grant:r "$($env:USERNAME):(R)"
 ```
 
-Never commit or share the private key. If it is exposed, create a replacement key, add its public key to `~/.ssh/authorized_keys`, update the GitHub secret, verify the new key, and remove the old key.
+## 3. Run These EC2 Commands Before the Env File
 
-## 3. Install Docker on EC2
-
-Run inside EC2:
+After SSH login, run this full block on EC2. It installs Docker, Docker Compose, Docker Buildx, starts Docker, and creates the upload folder.
 
 ```bash
 sudo dnf update -y
 sudo dnf install -y docker
 sudo systemctl enable --now docker
-sudo usermod -aG docker ec2-user
-sudo mkdir -p /opt/gatemind/uploads
-sudo chown -R 999:999 /opt/gatemind/uploads
-```
 
-Confirm Docker Compose is available:
-
-```bash
-sudo docker compose version
-```
-
-If it is unavailable:
-
-```bash
 sudo mkdir -p /usr/local/lib/docker/cli-plugins
+
 sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
-sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-```
 
-Install a compatible Docker Buildx plugin:
-
-```bash
-sudo mkdir -p /usr/local/lib/docker/cli-plugins
 sudo curl -SL https://github.com/docker/buildx/releases/download/v0.20.1/buildx-v0.20.1.linux-amd64 \
   -o /usr/local/lib/docker/cli-plugins/docker-buildx
+
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
+sudo mkdir -p /opt/gatemind/uploads
+
+sudo docker version
+sudo docker compose version
 sudo docker buildx version
 ```
 
-## 4. Create the Production Environment File
+If all three version commands print successfully, EC2 is ready for the backend env file.
+
+## 4. Create Backend Environment File
 
 On EC2:
 
@@ -109,81 +104,77 @@ On EC2:
 sudo nano /opt/gatemind/backend.env
 ```
 
-Add:
+Example:
 
 ```env
 APP_ENV=production
-SECRET_KEY=replace-with-a-long-random-secret
-MONGO_URI=your-mongodb-atlas-connection-string
+SECRET_KEY=replace-with-any-long-random-text
+MONGO_URI=your-mongodb-atlas-url
 MONGO_DB_NAME=gatemind
 MONGO_USE_MOCK=false
 UPLOAD_FOLDER=/app/uploads
 ENABLE_FILE_LOGGING=false
-ALLOWED_ORIGINS=https://your-frontend-domain.example
-GROQ_API_KEY=your-groq-key-if-used
-HUGGINGFACE_API_KEY=your-huggingface-key-if-used
-HF_TOKEN=your-huggingface-key-if-used
-OTP_PREVIEW_ENABLED=false
+ALLOWED_ORIGINS=http://localhost:5173,https://your-vercel-app.vercel.app
+GROQ_API_KEY=your-groq-key
+GROQ_MODEL=llama-3.3-70b-versatile
+HUGGINGFACE_API_KEY=your-huggingface-key
+HF_TOKEN=your-huggingface-key
+OTP_PREVIEW_ENABLED=true
 ```
 
-Set `OTP_PREVIEW_ENABLED=true` only while SMS delivery is unavailable. It returns OTPs to the requesting frontend and must be disabled after Twilio is configured.
+Save with `Ctrl+O`, Enter, then `Ctrl+X`.
 
-Pending OTPs are stored in the running backend process for ten minutes. A container restart or deployment invalidates pending OTPs.
+## 5. MongoDB Atlas
 
-The container port is fixed to `5000` by `docker-compose.prod.yml`; do not add `PORT` to this environment file.
-
-Protect the environment file:
-
-```bash
-sudo chmod 600 /opt/gatemind/backend.env
-```
-
-## 5. Configure MongoDB Atlas
-
-Add the EC2 Elastic IP followed by `/32` under:
+In MongoDB Atlas, allow your EC2 IP:
 
 ```text
-MongoDB Atlas -> Security -> Network Access
+YOUR_EC2_IP/32
 ```
 
-## 6. Configure GitHub Actions
+## 6. GitHub Secrets
 
-Open:
+GitHub repo -> Settings -> Secrets and variables -> Actions
+
+Repository secrets:
 
 ```text
-GitHub repository -> Settings -> Secrets and variables -> Actions
+EC2_HOST = your EC2 public/elastic IP
+EC2_SSH_PRIVATE_KEY = full content of your .pem file
 ```
 
-Add repository secrets:
+Repository variable:
 
-- `EC2_HOST`: EC2 Elastic IP
-- `EC2_SSH_PRIVATE_KEY`: complete contents of the private SSH key
-
-Add repository variable:
-
-- `EC2_USER`: `ec2-user`
-
-Secret names contain only letters, numbers, and underscores. Do not include `=`, spaces, or quotes in their names.
+```text
+EC2_USER = ec2-user
+```
 
 ## 7. Deploy
 
-Commit and push to `main`. Backend CI runs first. After it passes, GitHub Actions copies the backend to EC2 and rebuilds the Docker container.
+Push to `main`.
 
-You can also manually run:
+GitHub Actions will:
+
+1. Run backend tests
+2. Copy the backend folder to EC2
+3. Run Docker Compose on EC2
+4. Check `/api/health`
+
+You can also run it manually:
 
 ```text
-GitHub repository -> Actions -> Deploy Backend to EC2 -> Run workflow
+GitHub -> Actions -> Deploy Backend to EC2 -> Run workflow
 ```
 
-## 8. Verify
+## 8. Test
 
 Open:
 
 ```text
-http://YOUR_EC2_ELASTIC_IP/api/health
+http://YOUR_EC2_IP/api/health
 ```
 
-Expected response:
+Expected:
 
 ```json
 {
@@ -192,62 +183,22 @@ Expected response:
 }
 ```
 
-## Connect the Vercel Frontend
+## Useful Commands
 
-The frontend uses relative `/api` requests. `frontend/vercel.json` proxies those requests from Vercel to EC2, avoiding browser mixed-content errors while the backend uses HTTP.
+On EC2:
 
-Update the proxy destination whenever the Elastic IP changes:
-
-```json
-{
-  "source": "/api/:path*",
-  "destination": "http://YOUR_EC2_ELASTIC_IP/api/:path*"
-}
+```bash
+sudo docker ps
+sudo docker logs --tail 100 gatemind-backend
+sudo docker compose -f /opt/gatemind/source/backend/docker-compose.prod.yml restart
 ```
 
-Do not set `VITE_API_BASE_URL` in Vercel while using this proxy. After changing `frontend/vercel.json`, push the change and let Vercel redeploy.
+## Frontend on Vercel
 
-When a backend HTTPS domain is available, set:
+For the current simple setup, `frontend/vercel.json` proxies:
 
 ```text
-VITE_API_BASE_URL=https://api.your-domain.example
+/api/* -> http://YOUR_EC2_IP/api/*
 ```
 
-Then the frontend can call the backend domain directly.
-
-## HTTPS
-
-This basic setup uses HTTP. Before handling production users:
-
-1. Point a backend domain such as `api.your-domain.example` to the Elastic IP.
-2. Bind the Docker port to localhost instead of exposing it publicly.
-3. Install Nginx and configure it as a reverse proxy to `127.0.0.1:5000`.
-4. Install a Let's Encrypt certificate with Certbot.
-5. Change the Vercel API URL to the HTTPS backend domain.
-6. Set `ALLOWED_ORIGINS` to the exact Vercel production URL.
-
-## Useful EC2 Commands
-
-```bash
-sudo systemctl status docker --no-pager
-sudo docker ps -a
-sudo docker logs --tail 300 gatemind-backend
-sudo docker compose -f /opt/gatemind/source/backend/docker-compose.prod.yml restart
-curl http://127.0.0.1/api/health
-```
-
-Uploaded documents remain under `/opt/gatemind/uploads` across container deployments.
-
-Confirm an environment variable exists without displaying its value:
-
-```bash
-sudo docker exec gatemind-backend sh -c 'test -n "$MONGO_URI" && echo MONGO_URI=SET || echo MONGO_URI=MISSING'
-```
-
-Check whether OTP preview mode reached the container:
-
-```bash
-sudo docker exec gatemind-backend printenv OTP_PREVIEW_ENABLED
-```
-
-If GitHub Actions deployment fails, open the **Show backend diagnostics** step. It prints Docker status, health information, and recent application logs.
+If your EC2 IP changes, update `frontend/vercel.json` and redeploy Vercel.
