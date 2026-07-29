@@ -26,6 +26,7 @@ function normalizeMathSyntax(answer = "") {
 }
 
 export default function RagPanel() {
+
   const dispatch = useDispatch();
   const token = useSelector((state) => state.auth.user?.accessToken);
   const messages = useSelector((state) => state.data.ragHistory);
@@ -62,6 +63,7 @@ export default function RagPanel() {
     dispatch(setActiveRagConversation(conversationId));
     await dispatch(loadRagConversationMessages({ token, conversationId })).unwrap();
   }
+
 
   async function deleteConversation(event, conversationId) {
     event.stopPropagation();

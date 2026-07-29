@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { id: "profile", label: "Profile", icon: UserRound },
   { id: "mocktests", label: "Mock Tests", icon: ClipboardCheck },
   { id: "rag", label: "RAG Chat", icon: MessageSquareText },
+  
 ];
 
 export default function App() {

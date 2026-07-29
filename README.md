@@ -50,17 +50,517 @@ The platform also provides an administration workspace for managing users, quest
 - Metadata and document-level filtering
 - Reranking, context construction, and citation generation
 - Student-profile-aware response context
+# GATEMIND-AI System Architecture
 
-## System Architecture
+## 1. Overall System Architecture
 
 ```mermaid
 flowchart TD
-    UI["React + Redux frontend"] -->|REST API| API["Flask controllers"]
-    API --> SVC["Domain services"]
-    SVC --> REPO["Repository adapters"]
-    REPO --> DB[(MongoDB)]
-    SVC --> RAG["RAG pipeline"]
-    RAG --> LLM["OpenAI / Groq / local fallback"]
+    CLIENT["React + Redux Frontend"]
+    API["Flask API Controllers"]
+    SERVICES["Application Services"]
+    REPOSITORIES["Repository Layer"]
+    DATABASE[("MongoDB")]
+
+    CLIENT -->|"REST API"| API
+    API --> SERVICES
+    SERVICES --> REPOSITORIES
+    REPOSITORIES --> DATABASE
+```
+
+---
+
+## 2. Authentication Service Architecture
+
+```mermaid
+flowchart TD
+    CLIENT["React Authentication UI"]
+    API["Authentication Controller"]
+    AUTH["Authentication Service"]
+
+    PASSWORD["Password Service"]
+    JWT["JWT Service"]
+    OTP["OTP Service"]
+
+    USER_REPO["User Repository"]
+    DB[("MongoDB")]
+    SMS["SMS / OTP Provider"]
+
+    CLIENT --> API
+    API --> AUTH
+
+    AUTH --> PASSWORD
+    AUTH --> JWT
+    AUTH --> OTP
+    AUTH --> USER_REPO
+
+    OTP --> SMS
+    USER_REPO --> DB
+```
+
+### Registration and OTP Flow
+
+```mermaid
+flowchart TD
+    START["Submit registration details"]
+    VALIDATE["Validate email and password"]
+    CREATE["Create pending user"]
+    SEND["Generate and send OTP"]
+    VERIFY["User submits OTP"]
+    SAVE["Activate and save user"]
+    TOKEN["Generate access and refresh tokens"]
+
+    START --> VALIDATE
+    VALIDATE --> CREATE
+    CREATE --> SEND
+    SEND --> VERIFY
+    VERIFY --> SAVE
+    SAVE --> TOKEN
+```
+
+### Login Flow
+
+```mermaid
+flowchart TD
+    LOGIN["Submit email and password"]
+    FIND["Find user by email"]
+    CHECK["Verify hashed password"]
+    STATUS{"Account active?"}
+    TOKENS["Generate JWT tokens"]
+    RESPONSE["Return user and tokens"]
+    DENIED["Reject login"]
+
+    LOGIN --> FIND
+    FIND --> CHECK
+    CHECK --> STATUS
+    STATUS -->|"Yes"| TOKENS
+    STATUS -->|"No"| DENIED
+    TOKENS --> RESPONSE
+```
+
+---
+
+## 3. User Service Architecture
+
+```mermaid
+flowchart TD
+    UI["Student Dashboard"]
+    USER_API["User Controller"]
+    USER_SERVICE["User Service"]
+
+    PASSWORD["Password Service"]
+    USER_REPO["User Repository"]
+    PERFORMANCE_REPO["Performance Repository"]
+
+    DB[("MongoDB")]
+
+    UI --> USER_API
+    USER_API --> USER_SERVICE
+
+    USER_SERVICE --> PASSWORD
+    USER_SERVICE --> USER_REPO
+    USER_SERVICE --> PERFORMANCE_REPO
+
+    USER_REPO --> DB
+    PERFORMANCE_REPO --> DB
+```
+
+### Profile Update Flow
+
+```mermaid
+flowchart TD
+    REQUEST["Submit profile changes"]
+    AUTH["Validate access token"]
+    LOAD["Load user"]
+    UPDATE["Update allowed profile fields"]
+    SAVE["Save updated user"]
+    RESPONSE["Return updated profile"]
+
+    REQUEST --> AUTH
+    AUTH --> LOAD
+    LOAD --> UPDATE
+    UPDATE --> SAVE
+    SAVE --> RESPONSE
+```
+
+---
+
+## 4. Admin Service Architecture
+
+```mermaid
+flowchart TD
+    UI["Admin Dashboard"]
+    ADMIN_API["Admin Controller"]
+    RBAC["Admin Role Validation"]
+    ADMIN_SERVICE["Admin Service"]
+
+    ADMIN_REPO["Admin Repository"]
+    USER_REPO["User Repository"]
+    AUDIT_REPO["Audit Repository"]
+
+    DB[("MongoDB")]
+
+    UI --> ADMIN_API
+    ADMIN_API --> RBAC
+    RBAC --> ADMIN_SERVICE
+
+    ADMIN_SERVICE --> ADMIN_REPO
+    ADMIN_SERVICE --> USER_REPO
+    ADMIN_SERVICE --> AUDIT_REPO
+
+    ADMIN_REPO --> DB
+    USER_REPO --> DB
+    AUDIT_REPO --> DB
+```
+
+### Admin Request Flow
+
+```mermaid
+flowchart TD
+    REQUEST["Admin sends request"]
+    TOKEN["Validate admin token"]
+    ROLE["Check admin role"]
+    ACTION["Perform requested operation"]
+    AUDIT["Create audit record"]
+    RESPONSE["Return result"]
+    DENY["Return 403 Forbidden"]
+
+    REQUEST --> TOKEN
+    TOKEN --> ROLE
+    ROLE -->|"Allowed"| ACTION
+    ROLE -->|"Not allowed"| DENY
+    ACTION --> AUDIT
+    AUDIT --> RESPONSE
+```
+
+---
+
+## 5. Question-Bank Service Architecture
+
+```mermaid
+flowchart TD
+    UI["Admin Question-Bank UI"]
+    API["Question-Bank Controller"]
+    RBAC["Admin Permission Check"]
+    SERVICE["Question-Bank Service"]
+
+    QUESTION_REPO["Question Repository"]
+    AUDIT_REPO["Audit Repository"]
+    DB[("MongoDB")]
+
+    UI --> API
+    API --> RBAC
+    RBAC --> SERVICE
+
+    SERVICE --> QUESTION_REPO
+    SERVICE --> AUDIT_REPO
+
+    QUESTION_REPO --> DB
+    AUDIT_REPO --> DB
+```
+
+### Question Creation Flow
+
+```mermaid
+flowchart TD
+    INPUT["Admin enters question"]
+    VALIDATE["Validate question data"]
+    MODEL["Create question object"]
+    SAVE["Save through repository"]
+    AUDIT["Record admin activity"]
+    RESULT["Return created question"]
+
+    INPUT --> VALIDATE
+    VALIDATE --> MODEL
+    MODEL --> SAVE
+    SAVE --> AUDIT
+    AUDIT --> RESULT
+```
+
+### Mock-Test Creation Flow
+
+```mermaid
+flowchart TD
+    DETAILS["Enter mock-test details"]
+    QUESTIONS["Add new or existing questions"]
+    PREPARE["Validate and prepare questions"]
+    IDS["Collect question IDs"]
+    TEST["Create mock-test object"]
+    SAVE["Save mock test"]
+
+    DETAILS --> QUESTIONS
+    QUESTIONS --> PREPARE
+    PREPARE --> IDS
+    IDS --> TEST
+    TEST --> SAVE
+```
+
+---
+
+## 6. Mock-Test Evaluation Service Architecture
+
+```mermaid
+flowchart TD
+    UI["Student Mock-Test UI"]
+    API["Mock-Test Controller"]
+    SERVICE["Mock-Test Service"]
+
+    EVALUATOR["Question Evaluator"]
+    ANALYZER["Performance Analyzer"]
+
+    QUESTION_REPO["Question Repository"]
+    PERFORMANCE_REPO["Performance Repository"]
+    USER_REPO["User Repository"]
+    DB[("MongoDB")]
+
+    UI --> API
+    API --> SERVICE
+
+    SERVICE --> QUESTION_REPO
+    SERVICE --> EVALUATOR
+    EVALUATOR --> ANALYZER
+
+    SERVICE --> PERFORMANCE_REPO
+    SERVICE --> USER_REPO
+
+    QUESTION_REPO --> DB
+    PERFORMANCE_REPO --> DB
+    USER_REPO --> DB
+```
+
+### Mock-Test Submission Flow
+
+```mermaid
+flowchart TD
+    SUBMIT["Student submits answers"]
+    LOAD["Load test and questions"]
+    MAP["Map answers by question ID"]
+    EVALUATE["Evaluate every question"]
+    SCORE["Calculate marks and counts"]
+    SUBJECT["Create subject-wise analysis"]
+    RECORD["Save performance record"]
+    PROFILE["Update learning profile"]
+    RESULT["Return test result"]
+
+    SUBMIT --> LOAD
+    LOAD --> MAP
+    MAP --> EVALUATE
+    EVALUATE --> SCORE
+    SCORE --> SUBJECT
+    SUBJECT --> RECORD
+    RECORD --> PROFILE
+    PROFILE --> RESULT
+```
+
+---
+
+## 7. RAG Document Indexing Service
+
+```mermaid
+flowchart TD
+    UI["Document Upload UI"]
+    API["RAG Document Controller"]
+    INDEXER["Document Indexing Service"]
+
+    STORAGE[("Persistent Upload Storage")]
+    PARSER["PDF / Text / Image Parser"]
+    CHUNKER["Text Chunker"]
+    EMBEDDING["Embedding Model"]
+    RAG_REPO["RAG Repository"]
+    DB[("MongoDB")]
+
+    UI --> API
+    API --> INDEXER
+    API --> STORAGE
+
+    INDEXER --> PARSER
+    PARSER --> CHUNKER
+    CHUNKER --> EMBEDDING
+    EMBEDDING --> RAG_REPO
+    RAG_REPO --> DB
+```
+
+### Document Indexing Flow
+
+```mermaid
+flowchart TD
+    UPLOAD["Upload document"]
+    OWNERSHIP["Attach user ownership metadata"]
+    PARSE["Extract document text"]
+    SPLIT["Split text into chunks"]
+    EMBED["Generate chunk embeddings"]
+    STORE["Store chunks and metadata"]
+    READY["Document ready for retrieval"]
+
+    UPLOAD --> OWNERSHIP
+    OWNERSHIP --> PARSE
+    PARSE --> SPLIT
+    SPLIT --> EMBED
+    EMBED --> STORE
+    STORE --> READY
+```
+
+---
+
+## 8. RAG Chat Service Architecture
+
+```mermaid
+flowchart TD
+    UI["RAG Chat Interface"]
+    API["RAG Chat Controller"]
+    CHAT["RAG Chat Service"]
+
+    RETRIEVER["Hybrid Retriever"]
+    RERANKER["Hybrid Reranker"]
+    CONTEXT["Context Builder"]
+    LLM["LLM Service"]
+
+    RAG_REPO["RAG Repository"]
+    USER_REPO["User Repository"]
+    DB[("MongoDB")]
+
+    UI --> API
+    API --> CHAT
+
+    CHAT --> RETRIEVER
+    RETRIEVER --> RAG_REPO
+    RETRIEVER --> RERANKER
+    RERANKER --> CONTEXT
+
+    CHAT --> USER_REPO
+    CONTEXT --> LLM
+
+    RAG_REPO --> DB
+    USER_REPO --> DB
+```
+
+### RAG Question-Answering Flow
+
+```mermaid
+flowchart TD
+    QUESTION["User submits question"]
+    VERIFY["Validate conversation and documents"]
+    RETRIEVE["Retrieve relevant chunks"]
+    RERANK["Rerank retrieved chunks"]
+    PROFILE["Load learning profile"]
+    HISTORY["Load recent conversation"]
+    CONTEXT["Build final context"]
+    GENERATE["Generate grounded answer"]
+    CITATIONS["Create source citations"]
+    SAVE["Save messages and conversation"]
+
+    QUESTION --> VERIFY
+    VERIFY --> RETRIEVE
+    RETRIEVE --> RERANK
+    RERANK --> PROFILE
+    PROFILE --> HISTORY
+    HISTORY --> CONTEXT
+    CONTEXT --> GENERATE
+    GENERATE --> CITATIONS
+    CITATIONS --> SAVE
+```
+
+### Hybrid Retrieval Flow
+
+```mermaid
+flowchart TD
+    QUERY["User question"]
+    VECTOR["Semantic vector search"]
+    LEXICAL["Keyword-based search"]
+    COMBINE["Combine vector and lexical scores"]
+    FILTER["Apply ownership and document filters"]
+    RESULTS["Return top matching chunks"]
+
+    QUERY --> VECTOR
+    QUERY --> LEXICAL
+    VECTOR --> COMBINE
+    LEXICAL --> COMBINE
+    COMBINE --> FILTER
+    FILTER --> RESULTS
+```
+
+---
+
+## 9. Shared Security Architecture
+
+```mermaid
+flowchart TD
+    REQUEST["Incoming API request"]
+    BEARER["Extract bearer token"]
+    JWT["JWT Service"]
+    SUBJECT{"Token subject type"}
+    USER["Load student account"]
+    ADMIN["Load admin account"]
+    PERMISSION["Check account status and permission"]
+    CONTROLLER["Continue to protected controller"]
+    REJECT["Reject request"]
+
+    REQUEST --> BEARER
+    BEARER --> JWT
+    JWT --> SUBJECT
+
+    SUBJECT -->|"User"| USER
+    SUBJECT -->|"Admin"| ADMIN
+    SUBJECT -->|"Invalid"| REJECT
+
+    USER --> PERMISSION
+    ADMIN --> PERMISSION
+
+    PERMISSION -->|"Allowed"| CONTROLLER
+    PERMISSION -->|"Denied"| REJECT
+```
+
+---
+
+## 10. Repository and Persistence Architecture
+
+```mermaid
+flowchart TD
+    USER["User Repository"]
+    ADMIN["Admin Repository"]
+    QUESTION["Question Repository"]
+    PERFORMANCE["Performance Repository"]
+    RAG["RAG Repository"]
+    AUDIT["Audit Repository"]
+    DB[("MongoDB")]
+
+    USER --> DB
+    ADMIN --> DB
+    QUESTION --> DB
+    PERFORMANCE --> DB
+    RAG --> DB
+    AUDIT --> DB
+```
+
+---
+
+## 11. Deployment Architecture
+
+```mermaid
+flowchart TD
+    DEVELOPER["Developer pushes code"]
+    GITHUB["GitHub Repository"]
+    CI["GitHub Actions Backend CI"]
+    DEPLOY["Deployment Workflow"]
+    EC2["AWS EC2 Server"]
+
+    DOCKER["Docker Compose"]
+    BACKEND["Flask + Gunicorn Container"]
+    UPLOADS[("Persistent Upload Volume")]
+    MONGO[("MongoDB")]
+    PROVIDERS["LLM and OTP Providers"]
+
+    DEVELOPER --> GITHUB
+    GITHUB --> CI
+    CI -->|"Tests pass"| DEPLOY
+    DEPLOY -->|"SSH and SCP"| EC2
+
+    EC2 --> DOCKER
+    DOCKER --> BACKEND
+
+    BACKEND --> UPLOADS
+    BACKEND --> MONGO
+    BACKEND --> PROVIDERS
 ```
 
 The backend follows a layered structure:
