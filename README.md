@@ -589,39 +589,54 @@ The implementation uses Factory, Strategy, Adapter, Template Method, Builder, re
 
 GATEMIND-AI is organized around small, focused classes instead of placing HTTP handling, business rules, database queries, and AI logic in a single module. Its low-level design separates responsibilities through interfaces, service composition, dependency injection, and established design patterns.
 ### Design patterns used
+### LLD Design Patterns Used
 
-| Pattern | Project implementation | Why it is used |
+| Exact function/class name | LLD design pattern | Why it is used |
 |---|---|---|
-| Application Factory | `create_app()` in `backend/app/__init__.py` | Creates and configures the Flask application, database connection, repositories, services, middleware, and blueprints in one controlled composition root. |
-| Repository | `UserRepository` interface and `MongoUserRepository`, `MongoAdminRepository`, `MongoQuestionRepository`, `MongoPerformanceRepository`, `MongoRAGRepository`, `MongoAuditRepository` | Keeps MongoDB queries and persistence logic outside controllers and business services. |
-| Factory | `EmbeddingFactory`, `LLMServiceFactory`, `DocumentParserFactory`, and question-creation factory logic | Selects the correct embedding provider, LLM provider, document parser, or question type at runtime without exposing object-construction details to clients. |
-| Strategy | Document parsers, chunking strategies, embedding implementations, retrieval strategies, reranking strategies, and question-evaluation strategies | Allows one algorithm or provider to be replaced by another through a common contract. |
-| Strategy Context | `QuestionEvaluator` | Selects and executes the appropriate evaluation strategy according to the question type, such as MCQ, MSQ, or NAT. |
-| Adapter | `MongoVectorStoreAdapter`, Mongo repository implementations, SMS notification service, OCR parser, and external LLM implementations | Converts MongoDB or third-party provider operations into interfaces expected by the application and RAG layers. |
-| Template Method | Indexing-pipeline abstraction and `LangChainIndexingPipeline` | Defines the stable document-indexing sequence—parse, chunk, embed, enrich, and store—while allowing individual processing steps to vary. |
-| Template Function | `request()` in `frontend/src/lib/api.js` | Reuses a common sequence for preparing headers, serializing request bodies, calling `fetch()`, parsing responses, and handling errors. |
-| Builder | `ContextBuilder` | Builds the final LLM context incrementally from retrieved chunks, source metadata, conversation history, and student-profile information. |
-| Observer-style Update | `PersonalizedRAGUpdater` and `AuditLogger` | Reacts to important operations such as mock-test completion or administrator actions by updating personalization data or creating audit records. |
-| Facade | `AuthenticationService`, `MockTestService`, `RAGChatService`, `AdminDashboardService`, `JWTService`, and `frontend/src/lib/api.js` | Provides a simple interface over workflows involving several repositories, providers, security services, and processing components. |
-| Service Layer | `AuthenticationService`, `UserService`, `AdminAuthService`, `QuestionBankService`, `MockTestService`, and `RAGChatService` | Places application use-case logic between HTTP controllers and repositories so controllers remain focused on requests and responses. |
-| Domain Service | `PerformanceAnalyzer` and question-evaluation services | Contains business calculations that do not naturally belong to one domain entity, such as subject-wise marks, accuracy, and performance classification. |
-| Dependency Injection | Repository, password, JWT, verification, notification, retrieval, and other service dependencies passed through constructors | Reduces coupling and allows production implementations to be replaced by mocks, in-memory repositories, or alternative providers during testing. |
-| Dependency Inversion | Services depend on abstractions such as `UserRepository` instead of directly creating `MongoUserRepository` | Keeps high-level business logic independent of MongoDB and other infrastructure details. |
-| Composition Root | `create_app()` | Constructs the complete object graph in one location and injects dependencies into application services. |
-| Guard / Protection Proxy | `token_required`, `admin_required`, role checks, protected frontend views, and authentication middleware | Checks authentication, account state, token type, and permissions before allowing access to protected operations. |
-| Command-style Service | `StorageMaintenanceService.clear_logs_and_uploaded_documents()` | Encapsulates a privileged cleanup operation as one controlled service command with a structured result. |
-| Null Object / Fallback Strategy | Deterministic local embedding and LLM fallback implementations | Keeps development and automated tests functional when external AI credentials or providers are unavailable. |
-| Data Transfer Object (DTO) | `RAGResponse`, `Citation`, serialized API-response objects, and schema functions | Transfers structured data between services, controllers, and the frontend without exposing persistence details. |
-| Domain Model | `User`, `UserProfile`, `Session`, `Question`, `MockTest`, and performance-record models | Represents important business entities, state, and rules independently from HTTP and database code. |
-| Value Object | `Citation` and enum-based values such as roles, account status, and question types | Represents small domain values with a clear meaning and controlled structure. |
-| Mapper | Repository document-to-model conversions and schema serialization functions | Converts MongoDB documents into domain objects and domain objects into API response dictionaries. |
-| Coordinator | `OTPVerificationService` | Coordinates OTP generation, expiry, delivery, validation, and retry-related behavior through one service. |
-| Query Service | `AdminDashboardService` | Reads and combines information from multiple repositories to produce dashboard-oriented results without modifying domain state. |
-| Test Double | `InMemoryUserRepository`, MongoMock, mocked notification services, and local AI fallbacks | Replaces external infrastructure during unit and integration testing. |
-| Flux / Unidirectional Data Flow | Redux Toolkit store, slices, reducers, and async thunks | Keeps frontend state changes predictable by following action → reducer → updated-state flow. |
-| Composite | React component hierarchy | Builds complete pages and dashboards by composing smaller reusable UI components. |
-| Observer Mechanism | React hooks and Redux subscriptions | Re-renders components when local state or shared application state changes. |
-### SOLID principles
+| `create_app()` | Application Factory, Composition Root, Dependency Injection | Creates the Flask application, constructs dependencies, and injects repositories and services from one central location. |
+| `UserRepository` | Repository, Dependency Inversion | Defines an abstract contract so business services do not depend directly on MongoDB. |
+| `MongoUserRepository` | Repository, Adapter | Implements the repository contract and adapts MongoDB operations for the service layer. |
+| `MongoUserRepository.save()` | Repository, Data Mapper | Converts a user object into a MongoDB document and stores it. |
+| `MongoUserRepository.find_by_email()` | Repository, Data Mapper | Retrieves a MongoDB document by email and converts it into a user object. |
+| `MongoUserRepository.find_by_id()` | Repository, Data Mapper | Retrieves a MongoDB document by ID and converts it into a user object. |
+| `MongoUserRepository.update()` | Repository, Data Mapper | Converts user changes into a database update operation. |
+| `MongoUserRepository.delete()` | Repository | Hides the MongoDB deletion operation from the service layer. |
+| `MongoUserRepository.exists_by_email()` | Repository | Encapsulates the database query used to check whether an email already exists. |
+| `MongoUserRepository.find_by_refresh_token()` | Repository, Data Mapper | Finds a user through a refresh token and converts the stored document into a domain object. |
+| `MongoUserRepository.find_all()` | Repository, Data Mapper | Retrieves multiple MongoDB documents and converts them into user objects. |
+| `MongoUserRepository.count()` | Repository | Encapsulates the database operation used to count users. |
+| `AuthenticationService` | Service Layer, Facade, Dependency Injection | Centralizes authentication workflows while receiving repositories and security utilities as dependencies. |
+| `AuthenticationService.register_user()` | Service Layer, Facade | Coordinates validation, password hashing, user creation, OTP generation, and notification. |
+| `AuthenticationService.authenticate_user()` | Service Layer, Facade | Coordinates credential checking, account validation, token generation, and session storage. |
+| `AuthenticationService.logout_user()` | Service Layer | Contains the business workflow for invalidating a user session. |
+| `AuthenticationService.forgot_password()` | Service Layer, Facade | Coordinates user lookup, password-reset OTP generation, and OTP delivery. |
+| `AuthenticationService.reset_password()` | Service Layer, Facade | Coordinates OTP validation, password hashing, and password updating. |
+| `AuthenticationService.verify_otp()` | Service Layer, Facade | Provides one operation for validating an OTP through the verification service. |
+| `AuthenticationService.refresh_token()` | Service Layer, Facade | Coordinates refresh-token validation and creation of new authentication tokens. |
+| `UserService` | Service Layer, Facade, Dependency Injection | Centralizes user-related business operations and receives repositories and supporting services externally. |
+| `UserService.get_user_profile()` | Service Layer | Retrieves and prepares a user profile without exposing repository operations to controllers. |
+| `UserService.update_profile()` | Service Layer | Applies profile-update rules and delegates persistence to the repository. |
+| `UserService.change_password()` | Service Layer, Facade | Coordinates current-password verification, new-password hashing, and persistence. |
+| `UserService.get_preparation_progress()` | Query Service | Collects and returns read-only preparation-progress information. |
+| `UserService.get_mock_test_history()` | Query Service | Retrieves and prepares a user’s mock-test history without changing application state. |
+| `EmbeddingFactory.create()` | Factory | Selects and creates the required embedding implementation without exposing construction logic. |
+| `DocumentParserFactory` | Factory | Selects the correct parser according to the uploaded document type. |
+| `RecursiveChunkingStrategy` | Strategy | Encapsulates a replaceable algorithm for splitting documents into chunks. |
+| `QuestionEvaluator` | Strategy Context | Selects the appropriate evaluation algorithm according to the question type. |
+| `MongoVectorStoreAdapter` | Adapter | Converts MongoDB vector-storage operations into the interface required by the RAG system. |
+| `LangChainIndexingPipeline` | Template Method | Defines the common indexing sequence while allowing individual processing stages to vary. |
+| `ContextBuilder` | Builder | Constructs the RAG context step by step from chunks, metadata, conversation history, and profile data. |
+| `PersonalizedRAGUpdater` | Observer-style Update | Updates personalization information after relevant user-performance changes. |
+| `AuditLogger` | Observer-style Update | Records audit information after important administrative or application operations. |
+| `RAGChatService` | Facade, Service Layer | Provides a simple interface over retrieval, reranking, context construction, LLM generation, and history storage. |
+| `MockTestService` | Facade, Service Layer | Coordinates test loading, answer evaluation, score calculation, and performance storage. |
+| `QuestionBankService` | Service Layer | Contains business rules for creating, updating, validating, and deleting questions and mock tests. |
+| `AdminAuthService` | Facade, Service Layer | Coordinates administrator registration, authentication, token management, and account validation. |
+| `AdminDashboardService` | Query Service, Facade | Combines information from multiple repositories into dashboard-ready results. |
+| `PerformanceAnalyzer` | Domain Service | Performs domain-specific calculations such as marks, accuracy, and subject-wise performance. |
+| `OTPVerificationService` | Facade, Coordinator | Coordinates OTP generation, storage, expiry checking, validation, and retry behaviour. |
+| `token_required` | Protection Proxy, Guard | Prevents unauthenticated or invalid users from executing protected route functions. |
+| `admin_required` | Protection Proxy, Guard | Checks admin authentication, account status, token type, role, and permissions before route execution. |### SOLID principles
 
 #### 1. Single Responsibility Principle (SRP)
 
