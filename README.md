@@ -588,54 +588,39 @@ The implementation uses Factory, Strategy, Adapter, Template Method, Builder, re
 ## Low-Level Design (LLD)
 
 GATEMIND-AI is organized around small, focused classes instead of placing HTTP handling, business rules, database queries, and AI logic in a single module. Its low-level design separates responsibilities through interfaces, service composition, dependency injection, and established design patterns.
-
-### LLD component interaction
-
-```mermaid
-classDiagram
-    class Controller {
-      +handleRequest()
-    }
-    class ApplicationService {
-      +executeUseCase()
-    }
-    class Repository {
-      <<interface>>
-      +find()
-      +save()
-    }
-    class MongoRepository {
-      +find()
-      +save()
-    }
-    class DomainModel {
-      +businessState
-      +businessBehavior()
-    }
-
-    Controller --> ApplicationService
-    ApplicationService --> Repository
-    ApplicationService --> DomainModel
-    Repository <|.. MongoRepository
-```
-
-Controllers deal with HTTP concerns, application services coordinate use cases, domain models represent business state and behavior, and repository adapters isolate MongoDB operations. This makes it possible to replace an infrastructure dependency without rewriting the core workflow.
-
 ### Design patterns used
 
 | Pattern | Project implementation | Why it is used |
 |---|---|---|
-| Application Factory | `create_app()` in `backend/app/__init__.py` | Creates and configures the Flask application, dependencies, services, and blueprints in one controlled composition root. |
-| Repository | `MongoUserRepository`, `MongoQuestionRepository`, `MongoPerformanceRepository`, `MongoRAGRepository` | Keeps database queries outside controllers and business services. |
-| Factory | `EmbeddingFactory`, `LLMServiceFactory`, `DocumentParserFactory` | Selects the correct provider or parser at runtime without exposing construction logic to clients. |
-| Strategy | Chunking strategies and question-evaluation strategies | Allows one algorithm to be replaced by another through a common contract. |
-| Adapter | `MongoVectorStoreAdapter` and Mongo repository adapters | Converts MongoDB-backed operations into interfaces expected by the RAG and domain layers. |
-| Template Method | `LangChainIndexingPipeline` | Defines the document-indexing sequence while allowing individual processing steps to vary. |
-| Builder | `ContextBuilder` | Constructs the final RAG context from retrieved chunks and student-profile information. |
-| Observer-style update | `PersonalizedRAGUpdater` | Updates the student learning profile after mock-test performance changes. |
-| Facade | Service-facing import modules and `api` in `frontend/src/lib/api.js` | Provides a simpler entry point to a larger collection of backend or frontend operations. |
-| Dependency Injection | Repositories and supporting services passed through constructors | Reduces coupling and makes services easier to test with mocks or alternative implementations. |
-
+| Application Factory | `create_app()` in `backend/app/__init__.py` | Creates and configures the Flask application, database connection, repositories, services, middleware, and blueprints in one controlled composition root. |
+| Repository | `UserRepository` interface and `MongoUserRepository`, `MongoAdminRepository`, `MongoQuestionRepository`, `MongoPerformanceRepository`, `MongoRAGRepository`, `MongoAuditRepository` | Keeps MongoDB queries and persistence logic outside controllers and business services. |
+| Factory | `EmbeddingFactory`, `LLMServiceFactory`, `DocumentParserFactory`, and question-creation factory logic | Selects the correct embedding provider, LLM provider, document parser, or question type at runtime without exposing object-construction details to clients. |
+| Strategy | Document parsers, chunking strategies, embedding implementations, retrieval strategies, reranking strategies, and question-evaluation strategies | Allows one algorithm or provider to be replaced by another through a common contract. |
+| Strategy Context | `QuestionEvaluator` | Selects and executes the appropriate evaluation strategy according to the question type, such as MCQ, MSQ, or NAT. |
+| Adapter | `MongoVectorStoreAdapter`, Mongo repository implementations, SMS notification service, OCR parser, and external LLM implementations | Converts MongoDB or third-party provider operations into interfaces expected by the application and RAG layers. |
+| Template Method | Indexing-pipeline abstraction and `LangChainIndexingPipeline` | Defines the stable document-indexing sequence—parse, chunk, embed, enrich, and store—while allowing individual processing steps to vary. |
+| Template Function | `request()` in `frontend/src/lib/api.js` | Reuses a common sequence for preparing headers, serializing request bodies, calling `fetch()`, parsing responses, and handling errors. |
+| Builder | `ContextBuilder` | Builds the final LLM context incrementally from retrieved chunks, source metadata, conversation history, and student-profile information. |
+| Observer-style Update | `PersonalizedRAGUpdater` and `AuditLogger` | Reacts to important operations such as mock-test completion or administrator actions by updating personalization data or creating audit records. |
+| Facade | `AuthenticationService`, `MockTestService`, `RAGChatService`, `AdminDashboardService`, `JWTService`, and `frontend/src/lib/api.js` | Provides a simple interface over workflows involving several repositories, providers, security services, and processing components. |
+| Service Layer | `AuthenticationService`, `UserService`, `AdminAuthService`, `QuestionBankService`, `MockTestService`, and `RAGChatService` | Places application use-case logic between HTTP controllers and repositories so controllers remain focused on requests and responses. |
+| Domain Service | `PerformanceAnalyzer` and question-evaluation services | Contains business calculations that do not naturally belong to one domain entity, such as subject-wise marks, accuracy, and performance classification. |
+| Dependency Injection | Repository, password, JWT, verification, notification, retrieval, and other service dependencies passed through constructors | Reduces coupling and allows production implementations to be replaced by mocks, in-memory repositories, or alternative providers during testing. |
+| Dependency Inversion | Services depend on abstractions such as `UserRepository` instead of directly creating `MongoUserRepository` | Keeps high-level business logic independent of MongoDB and other infrastructure details. |
+| Composition Root | `create_app()` | Constructs the complete object graph in one location and injects dependencies into application services. |
+| Guard / Protection Proxy | `token_required`, `admin_required`, role checks, protected frontend views, and authentication middleware | Checks authentication, account state, token type, and permissions before allowing access to protected operations. |
+| Command-style Service | `StorageMaintenanceService.clear_logs_and_uploaded_documents()` | Encapsulates a privileged cleanup operation as one controlled service command with a structured result. |
+| Null Object / Fallback Strategy | Deterministic local embedding and LLM fallback implementations | Keeps development and automated tests functional when external AI credentials or providers are unavailable. |
+| Data Transfer Object (DTO) | `RAGResponse`, `Citation`, serialized API-response objects, and schema functions | Transfers structured data between services, controllers, and the frontend without exposing persistence details. |
+| Domain Model | `User`, `UserProfile`, `Session`, `Question`, `MockTest`, and performance-record models | Represents important business entities, state, and rules independently from HTTP and database code. |
+| Value Object | `Citation` and enum-based values such as roles, account status, and question types | Represents small domain values with a clear meaning and controlled structure. |
+| Mapper | Repository document-to-model conversions and schema serialization functions | Converts MongoDB documents into domain objects and domain objects into API response dictionaries. |
+| Coordinator | `OTPVerificationService` | Coordinates OTP generation, expiry, delivery, validation, and retry-related behavior through one service. |
+| Query Service | `AdminDashboardService` | Reads and combines information from multiple repositories to produce dashboard-oriented results without modifying domain state. |
+| Test Double | `InMemoryUserRepository`, MongoMock, mocked notification services, and local AI fallbacks | Replaces external infrastructure during unit and integration testing. |
+| Flux / Unidirectional Data Flow | Redux Toolkit store, slices, reducers, and async thunks | Keeps frontend state changes predictable by following action → reducer → updated-state flow. |
+| Composite | React component hierarchy | Builds complete pages and dashboards by composing smaller reusable UI components. |
+| Observer Mechanism | React hooks and Redux subscriptions | Re-renders components when local state or shared application state changes. |
 ### SOLID principles
 
 #### 1. Single Responsibility Principle (SRP)
