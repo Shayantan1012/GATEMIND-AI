@@ -267,14 +267,14 @@ flowchart TD
     VALIDATE["Validate question data"]
     MODEL["Create question object"]
     SAVE["Save through repository"]
-    AUDIT["Record admin activity"]
+    <!-- AUDIT["Record admin activity"] -->
     RESULT["Return created question"]
 
     INPUT --> VALIDATE
     VALIDATE --> MODEL
     MODEL --> SAVE
-    SAVE --> AUDIT
-    AUDIT --> RESULT
+    SAVE --> RESULT
+    <!-- AUDIT -->  -->
 ```
 
 ### Mock-Test Creation Flow
